@@ -1,0 +1,1649 @@
+    <script>
+        // Global variables
+        let appData = {
+            transactions: [],
+            categories: [],
+            budgets: {}
+        };
+        
+        let charts = {};
+        let historyDataTable;
+        let isGoogleSheetsMode = false;
+
+        // Initialize app
+        $(document).ready(function() {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            // Show loading overlay
+            showLoading();
+            
+            // Setup basic event handlers first
+            setupEventHandlers();
+            
+            // Check Google Sheets connection and load data
+            checkGoogleSheetsConnection();
+        }
+
+        // Check Google Sheets connection
+        function checkGoogleSheetsConnection() {
+            updateLoadingStatus('กำลังเชื่อมต่อกับ Google Sheets...');
+
+            google.script.run.withSuccessHandler(function() {
+              isGoogleSheetsMode = true;
+
+              updateLoadingStatus('กำลังเตรียมข้อมูล...');
+              initializeSheets();
+
+            }).withFailureHandler(function(error) {
+              console.error('Error connecting to Google Sheets:', error);
+              fallbackToLocalMode();
+
+            }).testConnection();
+        }
+
+        function initializeSheets() {
+          google.script.run.withSuccessHandler(function() {
+            updateLoadingStatus('กำลังโหลดข้อมูล...');
+            loadDataFromSource();
+
+          }).withFailureHandler(function(error) {
+            console.error('Error initializing sheets:', error);
+            fallbackToLocalMode();
+
+          }).initializeSheets();
+        }
+        
+        function fallbackToLocalMode() {
+            updateLoadingStatus('เปลี่ยนเป็นโหมดออฟไลน์...');
+            isGoogleSheetsMode = false;
+            
+            setTimeout(function() {
+                loadDataFromSource();
+            }, 1000);
+        }
+
+        // Show connection status
+        function showConnectionStatus(isConnected) {
+            let statusHtml;
+            
+            if (isConnected) {
+                // Check if we have real data or sample data
+                const hasRealData = appData.transactions.length > 0 && !appData.transactions[0].description.includes('ตัวอย่าง') && !appData.transactions[0].description.includes('เงินเดือนประจำเดือน');
+                
+                if (hasRealData) {
+                    statusHtml = '<div class="alert alert-success alert-dismissible fade show" role="alert"><i class="fas fa-cloud-check me-2"></i>เชื่อมต่อ Google Sheets สำเร็จ - พบข้อมูล ' + appData.transactions.length + ' รายการ<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
+                } else {
+                    statusHtml = '<div class="alert alert-info alert-dismissible fade show" role="alert"><i class="fas fa-info-circle me-2"></i>เชื่อมต่อ Google Sheets สำเร็จ - ยังไม่มีข้อมูลจริง กำลังแสดงข้อมูลตัวอย่าง<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
+                }
+            } else {
+                statusHtml = '<div class="alert alert-warning alert-dismissible fade show" role="alert"><i class="fas fa-exclamation-triangle me-2"></i>ใช้งานแบบออฟไลน์ - ข้อมูลจะถูกบันทึกในเบราว์เซอร์<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
+            }
+            
+            $('.main-content').prepend(statusHtml);
+            
+            // Auto hide after 3 seconds for info messages
+            setTimeout(() => {
+                $('.alert').fadeOut();
+            }, 3000);
+        }
+        
+        // ✅ โหลดข้อมูลจาก Google Sheets (หรือ local fallback)
+        function loadDataFromSource() {
+            if (isGoogleSheetsMode) {
+                google.script.run
+                    .withSuccessHandler(function(data) {
+
+                        if (data && typeof data === 'object') {
+                            // 🧾 Transactions
+                            if (Array.isArray(data.transactions)) {
+                                appData.transactions = data.transactions.map(t => {
+                                    let dateStr = t.date;
+                                    if (t.date && typeof t.date === 'object') {
+                                        dateStr = new Date(t.date).toISOString().split('T')[0];
+                                    } else if (typeof t.date === 'string' && t.date.includes('GMT')) {
+                                        dateStr = new Date(t.date).toISOString().split('T')[0];
+                                    } else if (typeof t.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.date)) {
+                                        dateStr = t.date;
+                                    } else {
+                                        const date = new Date(t.date);
+                                        dateStr = !isNaN(date.getTime()) ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+                                    }
+                                    return {
+                                        id: t.id || (Date.now() + Math.random()),
+                                        date: dateStr,
+                                        category: t.category || 'ไม่ระบุ',
+                                        type: t.type || 'expense',
+                                        description: t.description || '',
+                                        amount: parseFloat(t.amount) || 0
+                                    };
+                                });
+                            }
+
+                            // 📂 Categories
+                            if (Array.isArray(data.categories)) {
+                                appData.categories = data.categories.map(c => ({
+                                    id: c.id,
+                                    name: c.name,
+                                    type: c.type,
+                                    color: c.color || '#42a5f5'
+                                }));
+                            }
+
+                            // 💰 Budgets
+                            if (data.budgets && typeof data.budgets === 'object') {
+                                appData.budgets = data.budgets;
+                            }
+                        }
+
+                        // ตรวจสอบข้อมูลพื้นฐาน
+                        if (!appData.categories || appData.categories.length === 0) {
+                            createDefaultCategories();
+                        }
+
+                        if (!appData.transactions || appData.transactions.length === 0) {
+                            updateLoadingStatus('เชื่อมต่อสำเร็จ - ยังไม่มีข้อมูล');
+                        } else {
+                            updateLoadingStatus('โหลดข้อมูลจาก Google Sheets สำเร็จ');
+                        }
+
+                        initializeUI();
+                    })
+                    .withFailureHandler(function(error) {
+                        console.error('Error loading data:', error);
+                        fallbackToLocalMode();
+                    })
+                    .getAppData();
+            } else {
+                loadData(); // local fallback
+                if (!appData.transactions || appData.transactions.length === 0) {
+                    createMockData();
+                    saveData();
+                }
+                initializeUI();
+            }
+        }
+        
+        function initializeUI() {
+            updateLoadingStatus('กำลังเตรียมหน้าจอ...');
+            
+            setTimeout(function() {
+                // Initialize all UI components
+                updateCurrentMonth();
+                populateDashboardMonths();
+                addTransactionCard();
+                updateDashboard();
+                loadCategories();
+                loadBudgetForm();
+                loadTransactionHistory();
+                
+                showConnectionStatus(isGoogleSheetsMode);
+                hideLoading();
+            }, 500);
+        }
+
+        // Save data to appropriate source
+        function saveDataToSource() {
+            if (!isGoogleSheetsMode) {
+                saveData();
+            }
+        }
+
+        // Load data from localStorage or create mock data
+        function loadData() {
+            const savedData = localStorage.getItem('financeApp');
+            if (savedData) {
+                appData = JSON.parse(savedData);
+            } else {
+                createMockData();
+                saveData();
+            }
+        }
+
+        // Create default categories only
+        function createDefaultCategories() {
+            appData.categories = [
+                { id: 1, name: "เงินเดือน", type: "income", color: "#4caf50" },
+                { id: 2, name: "รายได้เสริม", type: "income", color: "#8bc34a" },
+                { id: 3, name: "อาหาร", type: "expense", color: "#ff9800" },
+                { id: 4, name: "เดินทาง", type: "expense", color: "#f44336" },
+                { id: 5, name: "ช้อปปิ้ง", type: "expense", color: "#e91e63" },
+                { id: 6, name: "บิล/ค่าใช้จ่าย", type: "expense", color: "#9c27b0" }
+            ];
+        }
+
+        // Create sample transactions to show the system works
+        function createSampleTransactions() {
+            const currentDate = new Date();
+            const currentMonth = currentDate.toISOString().slice(0, 7);
+            
+            appData.transactions = [
+                {
+                    id: Date.now() + 1,
+                    date: currentDate.toISOString().split('T')[0],
+                    category: "เงินเดือน",
+                    type: "income",
+                    amount: 35000,
+                    description: "เงินเดือนประจำเดือน"
+                },
+                {
+                    id: Date.now() + 2,
+                    date: new Date(currentDate.getTime() - 86400000).toISOString().split('T')[0], // Yesterday
+                    category: "อาหาร",
+                    type: "expense",
+                    amount: 150,
+                    description: "ข้าวกลางวัน"
+                },
+                {
+                    id: Date.now() + 3,
+                    date: new Date(currentDate.getTime() - 172800000).toISOString().split('T')[0], // 2 days ago
+                    category: "เดินทาง",
+                    type: "expense",
+                    amount: 80,
+                    description: "ค่าน้ำมันรถ"
+                }
+            ];
+            
+            // Set sample budget for current month
+            appData.budgets[currentMonth] = [
+                { categoryId: 3, amount: 5000 }, // อาหาร
+                { categoryId: 4, amount: 3000 }, // เดินทาง
+                { categoryId: 5, amount: 2000 }, // ช้อปปิ้ง
+                { categoryId: 6, amount: 4000 }  // บิล/ค่าใช้จ่าย
+            ];
+            
+        }
+
+        // Create initial mock data
+        function createMockData() {
+            const currentDate = new Date();
+            const currentMonth = currentDate.toISOString().slice(0, 7);
+            
+            appData = {
+                transactions: [
+                    {
+                        id: 1,
+                        date: "2025-01-01",
+                        category: "เงินเดือน",
+                        type: "income",
+                        amount: 35000,
+                        description: "เงินเดือนประจำเดือน"
+                    },
+                    {
+                        id: 2,
+                        date: "2025-01-02",
+                        category: "อาหาร",
+                        type: "expense",
+                        amount: 150,
+                        description: "ข้าวกลางวัน"
+                    },
+                    {
+                        id: 3,
+                        date: "2025-01-03",
+                        category: "เดินทาง",
+                        type: "expense",
+                        amount: 80,
+                        description: "ค่าน้ำมันรถ"
+                    },
+                    {
+                        id: 4,
+                        date: "2025-01-04",
+                        category: "ช้อปปิ้ง",
+                        type: "expense",
+                        amount: 1200,
+                        description: "เสื้อผ้า"
+                    },
+                    {
+                        id: 5,
+                        date: "2025-01-05",
+                        category: "รายได้เสริม",
+                        type: "income",
+                        amount: 2000,
+                        description: "งานพิเศษ"
+                    }
+                ],
+                categories: [
+                    { id: 1, name: "เงินเดือน", type: "income", color: "#4caf50" },
+                    { id: 2, name: "รายได้เสริม", type: "income", color: "#8bc34a" },
+                    { id: 3, name: "อาหาร", type: "expense", color: "#ff9800" },
+                    { id: 4, name: "เดินทาง", type: "expense", color: "#f44336" },
+                    { id: 5, name: "ช้อปปิ้ง", type: "expense", color: "#e91e63" },
+                    { id: 6, name: "บิล/ค่าใช้จ่าย", type: "expense", color: "#9c27b0" }
+                ],
+                budgets: {}
+            };
+            
+            // Set budget for current month
+            appData.budgets[currentMonth] = [
+                { categoryId: 3, amount: 5000 }, // อาหาร
+                { categoryId: 4, amount: 3000 }, // เดินทาง
+                { categoryId: 5, amount: 2000 }, // ช้อปปิ้ง
+                { categoryId: 6, amount: 4000 }  // บิล/ค่าใช้จ่าย
+            ];
+        }
+
+        // Save data to localStorage
+        function saveData() {
+            localStorage.setItem('financeApp', JSON.stringify(appData));
+        }
+
+        // Setup event handlers
+        function setupEventHandlers() {
+            $('#transactionForm').on('submit', saveTransactions);
+            $('#categoryForm').on('submit', addCategory);
+            $('#budgetForm').on('submit', saveBudget);
+        }
+
+        // Navigation functions
+        function showSection(sectionName) {
+            $('.section').removeClass('active');
+            $('#' + sectionName).addClass('active');
+            
+            $('.nav-link').removeClass('active');
+            $(`a[onclick="showSection('${sectionName}')"]`).addClass('active');
+            
+            if (sectionName === 'dashboard') {
+                updateDashboard();
+            } else if (sectionName === 'transactions') {
+                loadTransactionHistory();
+            } else if (sectionName === 'categories') {
+                loadCategories();
+            } else if (sectionName === 'budget') {
+                loadBudgetForm();
+            }
+        }
+
+        // Update current month display
+        function updateCurrentMonth() {
+            const currentDate = new Date();
+            const monthNames = [
+                'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+                'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+            ];
+            const monthText = `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear() + 543}`;
+            $('#currentMonth').text(monthText);
+            $('#budgetMonth').text(monthText);
+            $('#currentYear').text(currentDate.getFullYear() + 543);
+        }
+
+        // Populate dashboard month selector
+        function populateDashboardMonths() {
+            const monthSelect = $('#dashboardMonth');
+            const currentDate = new Date();
+            const currentMonth = currentDate.toISOString().slice(0, 7);
+            
+            // Get all unique months from transactions
+            const months = [...new Set(appData.transactions.map(t => t.date.slice(0, 7)))];
+            months.sort().reverse();
+            
+            // Add current month if not in list
+            if (!months.includes(currentMonth)) {
+                months.unshift(currentMonth);
+            }
+            
+            const monthNames = [
+                'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+                'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+            ];
+            
+            monthSelect.empty();
+            months.forEach(month => {
+                const [year, monthNum] = month.split('-');
+                const monthName = monthNames[parseInt(monthNum) - 1];
+                const displayText = `${monthName} ${parseInt(year) + 543}`;
+                const option = `<option value="${month}">${displayText}</option>`;
+                monthSelect.append(option);
+            });
+            
+            monthSelect.val(currentMonth);
+        }
+
+        // Transaction management
+        function addTransactionCard() {
+            const cardId = Date.now();
+            
+            const card = `
+                <div class="transaction-card" data-card-id="${cardId}">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">วันที่</label>
+                                <input type="date" class="form-control" name="date[]" value="${new Date().toISOString().split('T')[0]}" required>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">ประเภท</label>
+                                <select class="form-select type-select" name="type[]" required onchange="updateCategoriesFromType(this)">
+                                    <option value="">เลือกประเภท</option>
+                                    <option value="expense" selected>รายจ่าย</option>
+                                    <option value="income">รายรับ</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">หมวดหมู่</label>
+                                <select class="form-select category-select" name="category[]" required>
+                                    <option value="">เลือกหมวดหมู่</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">จำนวนเงิน</label>
+                                <input type="number" class="form-control" name="amount[]" placeholder="0.00" step="0.01" min="0" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-10 mb-3">
+                                <label class="form-label">รายละเอียด</label>
+                                <input type="text" class="form-control" name="description[]" placeholder="รายละเอียด (ไม่บังคับ)">
+                            </div>
+                            <div class="col-md-2 mb-3 d-flex align-items-end">
+                                <button type="button" class="btn btn-danger w-100" onclick="removeTransactionCard(${cardId})">
+                                    <i class="fas fa-trash me-1"></i>ลบ
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            $('#transactionCards').append(card);
+            
+            // Initialize categories for the new card
+            updateCategoriesFromType($(`div[data-card-id="${cardId}"] .type-select`)[0]);
+        }
+
+        function removeTransactionCard(cardId) {
+            $(`div[data-card-id="${cardId}"]`).remove();
+        }
+
+        function updateCategoriesFromType(selectElement) {
+            const selectedType = $(selectElement).val();
+            const categorySelect = $(selectElement).closest('.transaction-card').find('.category-select');
+            
+            categorySelect.empty();
+            categorySelect.append('<option value="">เลือกหมวดหมู่</option>');
+            
+            if (selectedType) {
+                const filteredCategories = appData.categories.filter(cat => cat.type === selectedType);
+                filteredCategories.forEach(category => {
+                    categorySelect.append(`<option value="${category.name}">${category.name}</option>`);
+                });
+            }
+        }
+
+        function saveTransactions(e) {
+          e.preventDefault();
+
+          const formData = new FormData(e.target);
+          const dates = formData.getAll('date[]');
+          const categories = formData.getAll('category[]');
+          const types = formData.getAll('type[]');
+          const descriptions = formData.getAll('description[]');
+          const amounts = formData.getAll('amount[]');
+
+          if (dates.length === 0) {
+              Swal.fire({
+                  icon: 'error',
+                  title: 'ข้อผิดพลาด',
+                  text: 'กรุณาเพิ่มรายการอย่างน้อย 1 รายการ'
+              });
+              return;
+          }
+
+          Swal.fire({
+              title: 'ยืนยันการบันทึก',
+              text: `คุณต้องการบันทึกรายการทั้งหมด ${dates.length} รายการใช่หรือไม่?`,
+              icon: 'question',
+              showCancelButton: true,
+              confirmButtonText: 'บันทึก',
+              cancelButtonText: 'ยกเลิก'
+          }).then((result) => {
+              if (!result.isConfirmed) return;
+
+              Swal.fire({
+                title: 'กำลังบันทึกข้อมูล...',
+                allowOutsideClick: false,
+                showConfirmButton: false
+              });
+
+              Swal.showLoading();
+
+              const newTransactions = [];
+
+              for (let i = 0; i < dates.length; i++) {
+                  const transaction = {
+                      id: Date.now() + i,
+                      date: dates[i],
+                      category: categories[i],
+                      type: types[i],
+                      description: descriptions[i],
+                      amount: parseFloat(amounts[i])
+                  };
+                  newTransactions.push(transaction);
+                  appData.transactions.push(transaction); // เพิ่มเข้า memory
+              }
+
+              if (isGoogleSheetsMode) {
+                  google.script.run
+                      .withSuccessHandler(function(response) {
+
+                          $('#transactionCards').empty();
+                          addTransactionCard();
+                          updateDashboard();
+                          loadTransactionHistory();
+                          populateDashboardMonths();
+
+                          Swal.fire({
+                              icon: 'success',
+                              title: 'สำเร็จ',
+                              text: 'บันทึกรายการเรียบร้อยแล้ว'
+                          });
+                      })
+                      .withFailureHandler(function(error) {
+                          console.error('❌ Error saving transactions:', error);
+                          Swal.fire({
+                              icon: 'error',
+                              title: 'ข้อผิดพลาด',
+                              text: 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองอีกครั้ง'
+                          });
+                      })
+                      .saveMultipleTransactions(newTransactions); // เรียก Apps Script
+              } else {
+                  // Local mode
+                  saveData();
+                  $('#transactionCards').empty();
+                  addTransactionCard();
+                  updateDashboard();
+                  loadTransactionHistory();
+                  populateDashboardMonths();
+
+                  Swal.fire({
+                      icon: 'success',
+                      title: 'สำเร็จ',
+                      text: 'บันทึกรายการเรียบร้อยแล้ว'
+                  });
+              }
+          });
+      }
+
+
+        function copyLastMonthData() {
+            const currentDate = new Date();
+            const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+            const lastMonthStr = lastMonth.toISOString().slice(0, 7);
+            
+            const lastMonthTransactions = appData.transactions.filter(t => t.date.startsWith(lastMonthStr));
+            
+            if (lastMonthTransactions.length === 0) {
+                Swal.fire('ไม่พบข้อมูล', 'ไม่มีรายการในเดือนที่แล้ว', 'info');
+                return;
+            }
+            
+            $('#transactionCards').empty();
+            
+            lastMonthTransactions.forEach(transaction => {
+                addTransactionCard();
+                const lastCard = $('#transactionCards .transaction-card:last');
+                lastCard.find('input[name="date[]"]').val(new Date().toISOString().split('T')[0]);
+                lastCard.find('select[name="type[]"]').val(transaction.type);
+                
+                // Update categories based on type first
+                updateCategoriesFromType(lastCard.find('select[name="type[]"]')[0]);
+                
+                // Then set the category
+                setTimeout(() => {
+                    lastCard.find('select[name="category[]"]').val(transaction.category);
+                }, 100);
+                
+                lastCard.find('input[name="description[]"]').val(transaction.description);
+                lastCard.find('input[name="amount[]"]').val(transaction.amount);
+            });
+            
+            Swal.fire('สำเร็จ', `คัดลอกข้อมูล ${lastMonthTransactions.length} รายการจากเดือนที่แล้วแล้ว`, 'success');
+        }
+
+        // Category management
+        function addCategory(e) {
+            e.preventDefault();
+
+            const name = $('#categoryName').val().trim();
+            const type = $('#categoryType').val();
+            const color = $('#categoryColor').val();
+
+            if (!name) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'กรุณากรอกชื่อหมวดหมู่',
+                    text: 'ชื่อหมวดหมู่ห้ามเว้นว่าง'
+                });
+                return;
+            }
+
+            const newCategory = {
+                id: Date.now(),
+                name: name,
+                type: type,
+                color: color
+            };
+
+            // เพิ่มลงใน memory ทันที
+            appData.categories.push(newCategory);
+
+            if (isGoogleSheetsMode) {
+                Swal.fire({
+                  title: 'กำลังบันทึกข้อมูล...',
+                  allowOutsideClick: false,
+                  showConfirmButton: false
+                });
+
+                Swal.showLoading();
+
+                google.script.run
+                    .withSuccessHandler(function (response) {
+
+                        // โหลดหมวดหมู่ใหม่เพื่อ sync UI
+                        loadCategories();
+                        updateAllTransactionCards();
+
+                        // รีเซ็ตฟอร์ม
+                        $('#categoryForm')[0].reset();
+                        $('#categoryColor').val('#42a5f5');
+
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'สำเร็จ',
+                            text: 'เพิ่มหมวดหมู่เรียบร้อยแล้ว'
+                        });
+                    })
+                    .withFailureHandler(function (error) {
+                        console.error('❌ Error saving category:', error);
+
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'ข้อผิดพลาด',
+                            text: 'ไม่สามารถบันทึกหมวดหมู่ได้ กรุณาลองใหม่อีกครั้ง'
+                        });
+                    })
+                    .saveCategory(newCategory); // ← เรียกฟังก์ชัน Apps Script
+            } else {
+                // Local mode
+                saveData();
+                loadCategories();
+                updateAllTransactionCards();
+
+                // รีเซ็ตฟอร์ม
+                $('#categoryForm')[0].reset();
+                $('#categoryColor').val('#42a5f5');
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'สำเร็จ',
+                    text: 'เพิ่มหมวดหมู่เรียบร้อยแล้ว'
+                });
+            }
+        }
+
+
+        function loadCategories() {
+            const incomeList = $('#incomeList');
+            const expenseList = $('#expenseList');
+            const filterCategory = $('#filterCategory');
+
+            incomeList.empty();
+            expenseList.empty();
+            filterCategory.empty();
+
+            // เพิ่ม option เริ่มต้น
+            filterCategory.append(`<option value="">-- ทั้งหมด --</option>`);
+
+            const incomeCategories = appData.categories.filter(c => c.type === 'income');
+            const expenseCategories = appData.categories.filter(c => c.type === 'expense');
+
+            function createCategoryCard(category) {
+                const typeText = category.type === 'income' ? 'รายรับ' : 'รายจ่าย';
+                const typeClass = category.type === 'income' ? 'success' : 'danger';
+
+                return `
+                    <div class="card mb-2">
+                        <div class="card-body d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <div class="me-3" style="width: 20px; height: 20px; background-color: ${category.color}; border-radius: 50%;"></div>
+                                <div>
+                                    <strong>${category.name}</strong>
+                                    <br><small class="text-${typeClass}">${typeText}</small>
+                                </div>
+                            </div>
+                            <button class="btn btn-danger btn-sm" onclick="deleteCategory(${category.id})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            incomeCategories.forEach(category => {
+                incomeList.append(createCategoryCard(category));
+                filterCategory.append(`<option value="${category.name}">${category.name}</option>`);
+            });
+
+            expenseCategories.forEach(category => {
+                expenseList.append(createCategoryCard(category));
+                filterCategory.append(`<option value="${category.name}">${category.name}</option>`);
+            });
+        }
+
+
+
+        function updateAllTransactionCards() {
+            $('.transaction-card .type-select').each(function() {
+                updateCategoriesFromType(this);
+            });
+        }
+
+        function deleteCategory(categoryId) {
+          Swal.fire({
+              title: 'ยืนยันการลบ',
+              text: 'คุณต้องการลบหมวดหมู่นี้ใช่หรือไม่?',
+              icon: 'warning',
+              showCancelButton: true,
+              confirmButtonText: 'ลบ',
+              cancelButtonText: 'ยกเลิก'
+          }).then((result) => {
+              if (!result.isConfirmed) return;
+
+              Swal.fire({
+                title: 'กำลังลบข้อมูล...',
+                allowOutsideClick: false,
+                showConfirmButton: false
+              });
+
+              Swal.showLoading();
+
+              // ลบออกจาก memory ก่อน
+              appData.categories = appData.categories.filter(cat => cat.id !== categoryId);
+
+              if (isGoogleSheetsMode) {
+                  google.script.run
+                      .withSuccessHandler(function (response) {
+
+                          // โหลดข้อมูลใหม่จาก Google Sheets เพื่อ sync UI
+                          loadCategories();
+                          updateAllTransactionCards();
+
+                          Swal.fire({
+                              icon: 'success',
+                              title: 'สำเร็จ',
+                              text: 'ลบหมวดหมู่เรียบร้อยแล้ว'
+                          });
+                      })
+                      .withFailureHandler(function (error) {
+                          console.error('❌ เกิดข้อผิดพลาดในการลบหมวดหมู่:', error);
+                          Swal.fire({
+                              icon: 'error',
+                              title: 'ข้อผิดพลาด',
+                              text: 'ไม่สามารถลบหมวดหมู่ได้ กรุณาลองอีกครั้ง'
+                          });
+                      })
+                      .deleteCategory(categoryId); // ← เรียกฟังก์ชัน Apps Script
+              } else {
+                  // Local mode
+                  saveData();
+                  loadCategories();
+                  updateAllTransactionCards();
+
+                  Swal.fire({
+                      icon: 'success',
+                      title: 'สำเร็จ',
+                      text: 'ลบหมวดหมู่เรียบร้อยแล้ว'
+                  });
+              }
+          });
+      }
+
+
+        // Budget management
+        function loadBudgetForm() {
+            populateBudgetMonthYear();
+
+            const selectedMonth = $('#budgetMonthSelect').val();
+            const selectedYear = $('#budgetYearSelect').val();
+            const selectedMonthYear = `${selectedYear}-${selectedMonth.padStart(2, '0')}`; // YYYY-MM
+
+            const budgetTableBody = $('#budgetTableBody');
+            budgetTableBody.empty();
+
+            // Filter หมวดหมู่ expense
+            const expenseCategories = appData.categories.filter(cat => cat.type === 'expense');
+
+            // ดึงงบประมาณของเดือนนี้
+            const currentBudgets = appData.budgets[selectedMonthYear] || [];
+
+            expenseCategories.forEach(category => {
+                const budget = currentBudgets.find(b => b.categoryId === category.id);
+                const budgetAmount = budget ? budget.amount : 0;
+
+                // คำนวณค่าใช้จริง
+                const actualAmount = appData.transactions
+                    .filter(t => t.date.startsWith(selectedMonthYear) && t.category === category.name && t.type === 'expense')
+                    .reduce((sum, t) => sum + t.amount, 0);
+
+                const remaining = budgetAmount - actualAmount;
+                const remainingClass = remaining >= 0 ? 'text-success' : 'text-danger';
+
+                const row = `
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="me-2" style="width: 15px; height: 15px; background-color: ${category.color}; border-radius: 50%;"></div>
+                                ${category.name}
+                            </div>
+                        </td>
+                        <td>
+                            <input type="number" class="form-control" name="budget_${category.id}" value="${budgetAmount}" min="0" step="0.01">
+                        </td>
+                        <td class="text-end">฿${actualAmount.toLocaleString()}</td>
+                        <td class="text-end ${remainingClass}">฿${remaining.toLocaleString()}</td>
+                    </tr>
+                `;
+                budgetTableBody.append(row);
+            });
+        }
+
+
+        function populateBudgetMonthYear() {
+            const monthSelect = $('#budgetMonthSelect');
+            const yearSelect = $('#budgetYearSelect');
+
+            const now = new Date();
+            const currentMonth = now.getMonth() + 1; // 1–12
+            const currentYear = now.getFullYear();
+
+            // Populate months if empty
+            if (monthSelect.children().length === 0) {
+                const monthNames = [
+                    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+                    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+                ];
+
+                monthNames.forEach((monthName, index) => {
+                    const monthValue = (index + 1).toString().padStart(2, '0'); // 01–12
+                    const selected = (index + 1 === currentMonth) ? 'selected' : '';
+                    monthSelect.append(`<option value="${monthValue}" ${selected}>${monthName}</option>`);
+                });
+            }
+
+            // Populate years if empty
+            if (yearSelect.children().length === 0) {
+                for (let year = currentYear - 2; year <= currentYear + 5; year++) {
+                    const displayYear = year + 543; // Convert to Buddhist year
+                    const selected = (year === currentYear) ? 'selected' : '';
+                    yearSelect.append(`<option value="${year}" ${selected}>${displayYear}</option>`);
+                }
+            }
+
+            // Safety check: ถ้า select มี แต่ยังไม่มีค่า ให้ตั้งเป็นปัจจุบัน
+            if (!monthSelect.val()) monthSelect.val(currentMonth.toString().padStart(2, '0'));
+            if (!yearSelect.val()) yearSelect.val(currentYear.toString());
+        }
+
+
+
+        function saveBudget(e) {
+          e.preventDefault();
+
+          const selectedMonth = $('#budgetMonthSelect').val();
+          const selectedYear = $('#budgetYearSelect').val();
+          const selectedMonthYear = `${selectedYear}-${selectedMonth.padStart(2, '0')}`;
+
+          const formData = new FormData(e.target);
+          const budgets = [];
+
+          // เก็บงบประมาณจากฟอร์มสำหรับแต่ละหมวดหมู่ expense
+          appData.categories
+              .filter(cat => cat.type === 'expense')
+              .forEach(category => {
+                  const amount = parseFloat(formData.get(`budget_${category.id}`)) || 0;
+                  budgets.push({
+                      categoryId: category.id,
+                      amount: amount
+                  });
+              });
+
+          // อัปเดต memory
+          appData.budgets[selectedMonthYear] = budgets;
+
+          const monthNames = [
+              'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+              'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+          ];
+          const monthName = monthNames[parseInt(selectedMonth) - 1];
+          const yearBE = parseInt(selectedYear) + 543;
+
+          if (isGoogleSheetsMode) {
+              Swal.fire({
+                title: 'กำลังบันทึกข้อมูล...',
+                allowOutsideClick: false,
+                showConfirmButton: false
+              });
+
+              Swal.showLoading();
+
+              google.script.run
+                  .withSuccessHandler(function(response) {
+
+                      updateDashboard();
+                      loadBudgetForm();
+
+                      Swal.fire({
+                          icon: 'success',
+                          title: 'สำเร็จ',
+                          text: `บันทึกงบประมาณ ${monthName} ${yearBE} เรียบร้อยแล้ว`
+                      });
+                  })
+                  .withFailureHandler(function(error) {
+                      console.error('❌ Error saving budget:', error);
+
+                      Swal.fire({
+                          icon: 'error',
+                          title: 'ข้อผิดพลาด',
+                          text: 'ไม่สามารถบันทึกงบประมาณได้ กรุณาลองอีกครั้ง'
+                      });
+                  })
+                  .saveBudget(selectedMonthYear, budgets); // เรียก Apps Script
+          } else {
+              // Local mode
+              saveData();
+              updateDashboard();
+              loadBudgetForm();
+
+              Swal.fire({
+                  icon: 'success',
+                  title: 'สำเร็จ',
+                  text: `บันทึกงบประมาณ ${monthName} ${yearBE} เรียบร้อยแล้ว`
+              });
+          }
+      }
+
+
+        function copyLastMonthBudget() {
+            const selectedMonth = parseInt($('#budgetMonthSelect').val());
+            const selectedYear = parseInt($('#budgetYearSelect').val());
+            
+            // Calculate previous month
+            let prevMonth = selectedMonth - 1;
+            let prevYear = selectedYear;
+            
+            if (prevMonth === 0) {
+                prevMonth = 12;
+                prevYear = selectedYear - 1;
+            }
+            
+            const prevMonthStr = `${prevYear}-${prevMonth.toString().padStart(2, '0')}`;
+            const lastMonthBudgets = appData.budgets[prevMonthStr];
+            
+            if (!lastMonthBudgets || lastMonthBudgets.length === 0) {
+                const monthNames = [
+                    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+                    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+                ];
+                const prevMonthName = monthNames[prevMonth - 1];
+                const prevYearBE = prevYear + 543;
+                
+                Swal.fire('ไม่พบข้อมูล', `ไม่มีงบประมาณใน ${prevMonthName} ${prevYearBE}`, 'info');
+                return;
+            }
+            
+            lastMonthBudgets.forEach(budget => {
+                $(`input[name="budget_${budget.categoryId}"]`).val(budget.amount);
+            });
+            
+            const monthNames = [
+                'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+                'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+            ];
+            const prevMonthName = monthNames[prevMonth - 1];
+            const prevYearBE = prevYear + 543;
+            
+            Swal.fire('สำเร็จ', `คัดลอกงบประมาณจาก ${prevMonthName} ${prevYearBE} แล้ว`, 'success');
+        }
+
+        // Dashboard functions
+        function updateDashboard() {
+            const selectedMonth = $('#dashboardMonth').val() || new Date().toISOString().slice(0, 7);
+            const currentTransactions = appData.transactions.filter(t => t.date.startsWith(selectedMonth));
+            
+            const totalIncome = currentTransactions
+                .filter(t => t.type === 'income')
+                .reduce((sum, t) => sum + t.amount, 0);
+            
+            const totalExpense = currentTransactions
+                .filter(t => t.type === 'expense')
+                .reduce((sum, t) => sum + t.amount, 0);
+            
+            const balance = totalIncome - totalExpense;
+            
+            $('#totalIncome').text('฿' + totalIncome.toLocaleString());
+            $('#totalExpense').text('฿' + totalExpense.toLocaleString());
+            $('#balance').text('฿' + balance.toLocaleString());
+            
+            updateCharts();
+            updateBudgetProgress();
+            updateYearSummaryChart();
+        }
+
+        function updateCharts() {
+            updateBudgetChart();
+            updateIncomeChart();
+            updateExpenseChart();
+        }
+
+        function updateBudgetChart() {
+            const selectedMonth = $('#dashboardMonth').val() || new Date().toISOString().slice(0, 7);
+            const currentBudgets = appData.budgets[selectedMonth] || [];
+            const expenseCategories = appData.categories.filter(cat => cat.type === 'expense');
+            
+            const labels = [];
+            const budgetData = [];
+            const actualData = [];
+            
+            expenseCategories.forEach(category => {
+                const budget = currentBudgets.find(b => b.categoryId === category.id);
+                const budgetAmount = budget ? budget.amount : 0;
+                
+                const actualAmount = appData.transactions
+                    .filter(t => t.date.startsWith(selectedMonth) && t.category === category.name && t.type === 'expense')
+                    .reduce((sum, t) => sum + t.amount, 0);
+                
+                if (budgetAmount > 0 || actualAmount > 0) {
+                    labels.push(category.name);
+                    budgetData.push(budgetAmount);
+                    actualData.push(actualAmount);
+                }
+            });
+            
+            const ctx = document.getElementById('budgetChart').getContext('2d');
+            
+            if (charts.budget) {
+                charts.budget.destroy();
+            }
+            
+            charts.budget = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'งบประมาณ',
+                            data: budgetData,
+                            backgroundColor: 'rgba(66, 165, 245, 0.7)',
+                            borderColor: 'rgba(66, 165, 245, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'ใช้จริง',
+                            data: actualData,
+                            backgroundColor: 'rgba(245, 66, 66, 0.7)',
+                            borderColor: 'rgba(245, 66, 66, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '฿' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ฿' + context.parsed.y.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+
+        function updateIncomeChart() {
+            const selectedMonth = $('#dashboardMonth').val() || new Date().toISOString().slice(0, 7);
+
+            const incomeTransactions = appData.transactions.filter(t => 
+                t.date.startsWith(selectedMonth) && t.type === 'income'
+            );
+
+            const categoryTotals = {};
+            const categoryColors = {};
+
+            incomeTransactions.forEach(transaction => {
+                if (!categoryTotals[transaction.category]) {
+                    categoryTotals[transaction.category] = 0;
+                    const category = appData.categories.find(cat => cat.name === transaction.category);
+                    categoryColors[transaction.category] = category ? category.color : '#66bb6a'; // default สีเขียว
+                }
+                categoryTotals[transaction.category] += transaction.amount;
+            });
+
+            const labels = Object.keys(categoryTotals);
+            const data = Object.values(categoryTotals);
+            const colors = labels.map(label => categoryColors[label]);
+
+            const ctx = document.getElementById('incomeChart').getContext('2d');
+
+            if (charts.income) {
+                charts.income.destroy();
+            }
+
+            charts.income = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        borderColor: colors.map(color => color + 'FF'),
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                    return `${context.label}: ฿${context.parsed.toLocaleString()} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+
+        function updateExpenseChart() {
+            const selectedMonth = $('#dashboardMonth').val() || new Date().toISOString().slice(0, 7);
+            const expenseTransactions = appData.transactions.filter(t => 
+                t.date.startsWith(selectedMonth) && t.type === 'expense'
+            );
+            
+            const categoryTotals = {};
+            const categoryColors = {};
+            
+            expenseTransactions.forEach(transaction => {
+                if (!categoryTotals[transaction.category]) {
+                    categoryTotals[transaction.category] = 0;
+                    const category = appData.categories.find(cat => cat.name === transaction.category);
+                    categoryColors[transaction.category] = category ? category.color : '#42a5f5';
+                }
+                categoryTotals[transaction.category] += transaction.amount;
+            });
+            
+            const labels = Object.keys(categoryTotals);
+            const data = Object.values(categoryTotals);
+            const colors = labels.map(label => categoryColors[label]);
+            
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            
+            if (charts.expense) {
+                charts.expense.destroy();
+            }
+            
+            charts.expense = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        borderColor: colors.map(color => color + 'FF'),
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                    return context.label + ': ฿' + context.parsed.toLocaleString() + ' (' + percentage + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateBudgetProgress() {
+            const selectedMonth = $('#dashboardMonth').val() || new Date().toISOString().slice(0, 7);
+            const currentBudgets = appData.budgets[selectedMonth] || [];
+            const progressContainer = $('#budgetProgress');
+            progressContainer.empty();
+
+            if (currentBudgets.length === 0) {
+                progressContainer.html('<p class="text-muted text-center">ยังไม่มีการตั้งงบประมาณ</p>');
+                return;
+            }
+
+            currentBudgets.forEach(budget => {
+                const category = appData.categories.find(cat => cat.id === budget.categoryId);
+                if (!category) return;
+
+                const actualAmount = appData.transactions
+                    .filter(t => t.date.startsWith(selectedMonth) && t.category === category.name && t.type === 'expense')
+                    .reduce((sum, t) => sum + t.amount, 0);
+
+                const percentage = budget.amount > 0 ? (actualAmount / budget.amount) * 100 : 0;
+
+                // ตัวเลขสีแดงถ้าเกินงบ
+                const amountClass = percentage > 100 ? 'text-danger' : 'text-muted';
+
+                // กำหนดสีของ progress bar ตามเงื่อนไข
+                let progressClass = 'bg-success';
+                if (percentage > 100) {
+                    progressClass = 'bg-danger';
+                } else if (percentage > 80) {
+                    progressClass = 'bg-warning';
+                }
+
+                const progressBar = `
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold">${category.name}</span>
+                            <span class="${amountClass}">฿${actualAmount.toLocaleString()} / ฿${budget.amount.toLocaleString()}</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar ${progressClass}" style="width: ${Math.min(percentage, 100)}%;">
+                                ${percentage.toFixed(1)}%
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                progressContainer.append(progressBar);
+            });
+        }
+
+
+
+
+
+
+        // โหลดข้อมูล + กรอง
+        function loadTransactionHistory() {
+            if (historyDataTable) {
+                historyDataTable.destroy();
+            }
+
+            const tableBody = $('#historyTable tbody');
+            tableBody.empty();
+
+            const selectedCategory = $('#filterCategory').val();
+            const startDate = $('#filterStartDate').val() ? new Date($('#filterStartDate').val()) : null;
+            const endDate = $('#filterEndDate').val() ? new Date($('#filterEndDate').val()) : null;
+
+            const filteredTransactions = appData.transactions.filter(transaction => {
+                let match = true;
+
+                if (selectedCategory && transaction.category !== selectedCategory) {
+                    match = false;
+                }
+
+                const transDate = new Date(transaction.date);
+                if (startDate && transDate < startDate) {
+                    match = false;
+                }
+                if (endDate) {
+                    endDate.setHours(23, 59, 59, 999);
+                    if (transDate > endDate) {
+                        match = false;
+                    }
+                }
+
+                return match;
+            }).slice().reverse();
+
+            filteredTransactions.forEach(transaction => {
+                const typeText = transaction.type === 'income' ? 'รายรับ' : 'รายจ่าย';
+                const typeClass = transaction.type === 'income' ? 'success' : 'danger';
+                const amountText = transaction.type === 'income' ? '+' : '-';
+
+                const row = `
+                    <tr>
+                        <td>${new Date(transaction.date).toLocaleDateString('th-TH')}</td>
+                        <td>${transaction.category}</td>
+                        <td><span class="badge bg-${typeClass}">${typeText}</span></td>
+                        <td>${transaction.description}</td>
+                        <td class="text-end text-${typeClass}">${amountText}฿${transaction.amount.toLocaleString()}</td>
+                        <td class="text-center">
+                            <button class="btn btn-danger btn-sm" onclick="deleteTransaction(${transaction.id})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                tableBody.append(row);
+            });
+
+            historyDataTable = $('#historyTable').DataTable({
+                language: {
+                    url: 'https://cdn.datatables.net/plug-ins/1.13.6/i18n/th.json'
+                },
+                order: [[0, 'desc']],
+                pageLength: 10,
+                responsive: true
+            });
+        }
+
+        $('#filterCategory, #filterStartDate, #filterEndDate').on('change', function () {
+            loadTransactionHistory();
+        });
+
+        // ปุ่มรีเซ็ตตัวกรอง
+        $('#resetFilter').on('click', function () {
+            $('#filterCategory').val('');
+            $('#filterStartDate').val('');
+            $('#filterEndDate').val('');
+            loadTransactionHistory();
+        });
+
+        function deleteTransaction(transactionId) {
+          Swal.fire({
+              title: 'ยืนยันการลบ',
+              text: 'คุณต้องการลบรายการนี้ใช่หรือไม่?',
+              icon: 'warning',
+              showCancelButton: true,
+              confirmButtonText: 'ลบ',
+              cancelButtonText: 'ยกเลิก'
+          }).then((result) => {
+              if (!result.isConfirmed) return;
+
+              // ลบออกจาก memory ทันที
+              appData.transactions = appData.transactions.filter(t => t.id !== transactionId);
+
+              if (isGoogleSheetsMode) {
+                Swal.fire({
+                  title: 'กำลังลบข้อมูล...',
+                  allowOutsideClick: false,
+                  showConfirmButton: false
+                });
+
+                Swal.showLoading();
+
+                  google.script.run
+                      .withSuccessHandler(function(response) {
+
+                          // อัปเดต UI หลังลบ
+                          loadTransactionHistory();
+                          updateDashboard();
+
+                          Swal.fire({
+                              icon: 'success',
+                              title: 'สำเร็จ',
+                              text: 'ลบรายการเรียบร้อยแล้ว'
+                          });
+                      })
+                      .withFailureHandler(function(error) {
+                          console.error('❌ Error deleting transaction:', error);
+
+                          Swal.fire({
+                              icon: 'error',
+                              title: 'ข้อผิดพลาด',
+                              text: 'ไม่สามารถลบรายการได้ กรุณาลองอีกครั้ง'
+                          });
+                      })
+                      .deleteTransaction(transactionId); // เรียก Apps Script
+              } else {
+                  // Local mode
+                  saveData();
+                  loadTransactionHistory();
+                  updateDashboard();
+
+                  Swal.fire({
+                      icon: 'success',
+                      title: 'สำเร็จ',
+                      text: 'ลบรายการเรียบร้อยแล้ว'
+                  });
+              }
+          });
+      }
+
+
+        // Year Summary Chart
+        function updateYearSummaryChart() {
+            const currentYear = new Date().getFullYear();
+            const monthNames = [
+                'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+                'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+            ];
+            
+            const incomeData = [];
+            const expenseData = [];
+            
+            // Calculate data for each month
+            for (let month = 0; month < 12; month++) {
+                const monthStr = `${currentYear}-${String(month + 1).padStart(2, '0')}`;
+                
+                const monthTransactions = appData.transactions.filter(t => t.date.startsWith(monthStr));
+                
+                const monthIncome = monthTransactions
+                    .filter(t => t.type === 'income')
+                    .reduce((sum, t) => sum + t.amount, 0);
+                
+                const monthExpense = monthTransactions
+                    .filter(t => t.type === 'expense')
+                    .reduce((sum, t) => sum + t.amount, 0);
+                
+                incomeData.push(monthIncome);
+                expenseData.push(monthExpense);
+            }
+            
+            const ctx = document.getElementById('yearSummaryChart').getContext('2d');
+            
+            if (charts.yearSummary) {
+                charts.yearSummary.destroy();
+            }
+            
+            charts.yearSummary = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: monthNames,
+                    datasets: [
+                        {
+                            label: 'รายรับ',
+                            data: incomeData,
+                            borderColor: '#4caf50',
+                            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.4,
+                            pointBackgroundColor: '#4caf50',
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 2,
+                            pointRadius: 6,
+                            pointHoverRadius: 8
+                        },
+                        {
+                            label: 'รายจ่าย',
+                            data: expenseData,
+                            borderColor: '#f44336',
+                            backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.4,
+                            pointBackgroundColor: '#f44336',
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 2,
+                            pointRadius: 6,
+                            pointHoverRadius: 8
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '฿' + value.toLocaleString();
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff',
+                            borderColor: 'rgba(255, 255, 255, 0.2)',
+                            borderWidth: 1,
+                            cornerRadius: 8,
+                            displayColors: true,
+                            callbacks: {
+                                title: function(context) {
+                                    const monthIndex = context[0].dataIndex;
+                                    const fullMonthNames = [
+                                        'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+                                        'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+                                    ];
+                                    return `${fullMonthNames[monthIndex]} ${currentYear + 543}`;
+                                },
+                                label: function(context) {
+                                    const label = context.dataset.label;
+                                    const value = context.parsed.y;
+                                    return `${label}: ฿${value.toLocaleString()}`;
+                                },
+                                afterBody: function(context) {
+                                    const monthIndex = context[0].dataIndex;
+                                    const income = incomeData[monthIndex];
+                                    const expense = expenseData[monthIndex];
+                                    const balance = income - expense;
+                                    const balanceText = balance >= 0 ? 'เหลือ' : 'ขาด';
+                                    return [``, `${balanceText}: ฿${Math.abs(balance).toLocaleString()}`];
+                                }
+                            }
+                        },
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 20,
+                                font: {
+                                    size: 14,
+                                    family: 'Prompt'
+                                }
+                            }
+                        }
+                    },
+                    elements: {
+                        point: {
+                            hoverBorderWidth: 3
+                        }
+                    }
+                }
+            });
+        }
+
+        // Loading overlay functions
+        function showLoading() {
+            $('#loadingOverlay').show();
+            $('.main-content').addClass('loading').removeClass('loaded');
+        }
+        
+        function hideLoading() {
+            $('#loadingOverlay').addClass('fade-out');
+            $('.main-content').removeClass('loading').addClass('loaded');
+            
+            setTimeout(() => {
+                $('#loadingOverlay').hide().removeClass('fade-out');
+            }, 500);
+        }
+        
+        function updateLoadingStatus(message) {
+            $('#loadingStatus').text(message);
+        }
+
+        // Settings
+        function clearAllData() {
+            Swal.fire({
+                title: 'ยืนยันการล้างข้อมูล',
+                text: 'คุณต้องการล้างข้อมูลทั้งหมดใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'ล้างข้อมูล',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#d33'
+            }).then((result) => {
+                if (!result.isConfirmed) return;
+
+                if (isGoogleSheetsMode) {
+                    Swal.fire({
+                      title: 'กำลังลบข้อมูล...',
+                      allowOutsideClick: false,
+                      showConfirmButton: false
+                    });
+
+                    Swal.showLoading();
+                    google.script.run
+                        .withSuccessHandler(function(response) {
+
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'สำเร็จ',
+                                text: 'ล้างข้อมูลทั้งหมดเรียบร้อยแล้ว'
+                            }).then(function() {
+                                google.script.run.withSuccessHandler((url)=>{
+                                  window.open(url,'_top')
+                                }).getURL()
+                            });
+                        })
+                        .withFailureHandler(function(error) {
+                            console.error('❌ Error clearing data:', error);
+
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'ข้อผิดพลาด',
+                                text: 'ไม่สามารถล้างข้อมูลได้ กรุณาลองอีกครั้ง'
+                            });
+                        })
+                        .clearAllData(); // เรียก Apps Script
+                } else {
+                    // Local mode
+                    localStorage.removeItem('financeApp');
+                    google.script.run.withSuccessHandler((url)=>{
+                      window.open(url,'_top')
+                    }).getURL()
+                }
+            });
+        }
+
+    </script>
