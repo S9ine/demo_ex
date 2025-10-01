@@ -871,21 +871,21 @@
                 const remaining = budgetAmount - actualAmount;
                 const remainingClass = remaining >= 0 ? 'text-success' : 'text-danger';
 
-                const row = `
-                    <tr>
-                        <td>
-                            <div class="d-flex align-items-center">
-                                <div class="me-2" style="width: 15px; height: 15px; background-color: ${category.color}; border-radius: 50%;"></div>
-                                ${category.name}
-                            </div>
-                        </td>
-                        <td>
-                            <input type="number" class="form-control" name="budget_${category.id}" value="${budgetAmount}" min="0" step="0.01">
-                        </td>
-                        <td class="text-end">฿${actualAmount.toLocaleString()}</td>
-                        <td class="text-end ${remainingClass}">฿${remaining.toLocaleString()}</td>
-                    </tr>
-                `;
+const row = `
+    <tr>
+        <td>
+            <div class="d-flex align-items-center">
+                <div class="me-2" style="width: 15px; height: 15px; background-color: ${category.color}; border-radius: 50%;"></div>
+                ${category.name}
+            </div>
+        </td>
+        <td>
+            <input type="number" class="form-control" name="budget_${category.id}" value="${budgetAmount}" min="0" step="0.01">
+        </td>
+        <td class="text-end">฿${actualAmount.toLocaleString()}</td>
+        <td class="text-end ${remainingClass}">฿${remaining.toLocaleString()}</td>
+    </tr>
+`;
                 budgetTableBody.append(row);
             });
         }
