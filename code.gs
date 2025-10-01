@@ -35,10 +35,8 @@ function initializeSheets() {
   let transactionsSheet = ss.getSheetByName(TRANSACTIONS_SHEET);
   if (!transactionsSheet) {
     transactionsSheet = ss.insertSheet(TRANSACTIONS_SHEET);
-    transactionsSheet.getRange(1, 1, 1, 6).setValues([
-      ['ID', 'Date', 'Category', 'Type', 'Amount', 'Description']
-    ]);
-    transactionsSheet.getRange(1, 1, 1, 6).setFontWeight('bold');
+    const headers = [['ID', 'Date', 'Category', 'Type', 'Amount', 'Description']];
+    transactionsSheet.getRange(1, 1, 1, headers[0].length).setValues(headers).setFontWeight('bold');
   }
   
   // Create Categories sheet
@@ -107,29 +105,31 @@ function saveTransaction(transaction) {
 
 function saveMultipleTransactions(transactions) {
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ss = SpreadsheetApp.getActiveSpreadpreheet();
     let sheet = ss.getSheetByName(TRANSACTIONS_SHEET);
-    
     if (!sheet) {
-      initializeSheets();
+      initializeSheets(); // ถ้ายังไม่มีชีต ให้สร้างก่อน
       sheet = ss.getSheetByName(TRANSACTIONS_SHEET);
     }
     
-    const rows = transactions.map(transaction => [
-      transaction.id || new Date().getTime() + Math.random(),
-      transaction.date,
-      transaction.category,
-      transaction.type,
-      transaction.amount,
-      transaction.description || ''
+    // แปลง array of objects ให้เป็น array of arrays (rows) สำหรับการบันทึก
+    const rows = transactions.map(t => [
+      t.id || new Date().getTime() + Math.random(), // สร้าง ID ถ้าไม่มี
+      new Date(t.date), // แปลง string date เป็น Date object
+      t.category,
+      t.type,
+      t.amount,
+      t.description || '' // ใส่ค่าว่างถ้าไม่มี description
     ]);
     
     if (rows.length > 0) {
-      sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 6).setValues(rows);
+      // บันทึกข้อมูลทั้งหมดลงชีตในครั้งเดียวเพื่อประสิทธิภาพที่ดีกว่าการ appendRow ทีละแถว
+      sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
     }
     
     return { success: true, count: rows.length };
   } catch (error) {
+    Logger.log(`Error in saveMultipleTransactions: ${error.toString()}`);
     return { success: false, error: error.toString() };
   }
 }
