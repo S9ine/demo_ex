@@ -1,30 +1,81 @@
     <script>
-        // Global variables
-        let appData = {
-            transactions: [],
-            categories: [],
-            budgets: {}
-        };
-        
-        let charts = {};
-        let historyDataTable;
-        let isGoogleSheetsMode = false;
+    // ===================================================================================
+    // GLOBAL VARIABLES & APP INITIALIZATION
+    // ===================================================================================
 
-        // Initialize app
-        $(document).ready(function() {
-            initializeApp();
+    // ตัวแปรเก็บข้อมูลหลักของแอปพลิเคชันทั้งหมด (State Management)
+    let appData = {
+        transactions: [],
+        categories: [],
+        budgets: {}
+    };
+
+    // ตัวแปรสำหรับเก็บ instance ของ Chart.js เพื่อให้สามารถทำลาย (destroy) และสร้างใหม่ได้
+    let charts = {};
+    // ตัวแปรสำหรับเก็บ instance ของ DataTable สำหรับตารางประวัติ
+    let historyDataTable;
+    // Flag ตรวจสอบสถานะการเชื่อมต่อกับ Google Sheets
+    let isGoogleSheetsMode = false;
+
+    // ฟังก์ชันหลักที่จะถูกเรียกเมื่อหน้าเว็บโหลดเสร็จสมบูรณ์
+    $(document).ready(function() {
+        initializeApp();
+    });
+
+    /**
+     * @name initializeApp
+     * @description เริ่มต้นการทำงานของแอปพลิเคชันทั้งหมด
+     * 1. แสดง Loading Overlay
+     * 2. ตั้งค่า Event Handlers พื้นฐาน
+     * 3. เริ่มกระบวนการตรวจสอบการเชื่อมต่อและโหลดข้อมูล
+     * 4. ตั้งค่า Theme เริ่มต้น
+     */
+    function initializeApp() {
+        showLoading();
+        setupEventHandlers();
+        setupThemeSwitcher(); // เพิ่มการตั้งค่า Theme Switcher
+        checkGoogleSheetsConnection();
+    }
+
+    // ===================================================================================
+    // THEME SWITCHER LOGIC 🎨
+    // ===================================================================================
+    
+    /**
+     * @name setupThemeSwitcher
+     * @description ตั้งค่าการทำงานของปุ่มสลับ Theme
+     * 1. ตรวจสอบ Theme ที่บันทึกไว้ใน localStorage
+     * 2. กำหนด Theme เริ่มต้น (หากไม่มีที่บันทึกไว้ จะใช้ light)
+     * 3. เพิ่ม Event Listener ให้กับปุ่ม #theme-switcher
+     * 4. เมื่อคลิก จะสลับ theme และบันทึกค่าใหม่ลง localStorage
+     */
+    function setupThemeSwitcher() {
+        const switcher = $('#theme-switcher');
+        const body = $('body');
+        const currentTheme = localStorage.getItem('appTheme') || 'light';
+
+        // ตั้งค่า theme เริ่มต้นตามที่บันทึกไว้
+        body.attr('data-theme', currentTheme);
+        updateThemeIcon(currentTheme);
+
+        switcher.on('click', function() {
+            const newTheme = body.attr('data-theme') === 'light' ? 'dark' : 'light';
+            body.attr('data-theme', newTheme);
+            localStorage.setItem('appTheme', newTheme);
+            updateThemeIcon(newTheme);
+
+            updateDashboard();
         });
 
-        function initializeApp() {
-            // Show loading overlay
-            showLoading();
-            
-            // Setup basic event handlers first
-            setupEventHandlers();
-            
-            // Check Google Sheets connection and load data
-            checkGoogleSheetsConnection();
+        function updateThemeIcon(theme) {
+            if (theme === 'dark') {
+                switcher.find('i').removeClass('fa-moon').addClass('fa-sun');
+            } else {
+                switcher.find('i').removeClass('fa-sun').addClass('fa-moon');
+            }
         }
+    }
+
 
         // Check Google Sheets connection
         function checkGoogleSheetsConnection() {
@@ -488,81 +539,73 @@
               return;
           }
 
-          Swal.fire({
-              title: 'ยืนยันการบันทึก',
-              text: `คุณต้องการบันทึกรายการทั้งหมด ${dates.length} รายการใช่หรือไม่?`,
-              icon: 'question',
-              showCancelButton: true,
-              confirmButtonText: 'บันทึก',
-              cancelButtonText: 'ยกเลิก'
-          }).then((result) => {
-              if (!result.isConfirmed) return;
+        Swal.fire({
+            title: 'ยืนยันการบันทึก',
+            text: `คุณต้องการบันทึกรายการทั้งหมด ${dates.length} รายการใช่หรือไม่?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'บันทึก',
+            cancelButtonText: 'ยกเลิก'
+        }).then((result) => {
+            if (!result.isConfirmed) return;
 
-              Swal.fire({
+            Swal.fire({
                 title: 'กำลังบันทึกข้อมูล...',
                 allowOutsideClick: false,
-                showConfirmButton: false
-              });
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
 
-              Swal.showLoading();
+            const newTransactions = [];
+            for (let i = 0; i < dates.length; i++) {
+                const transaction = {
+                    // QA Improvement: ใช้ Math.random() เพื่อลดโอกาสการซ้ำซ้อนของ ID
+                    // สำหรับแอปที่ใหญ่ขึ้น แนะนำให้ใช้ library สร้าง UUID/GUID ที่มีความแน่นอนกว่า
+                    id: Date.now() + Math.random(),
+                    date: dates[i],
+                    category: categories[i],
+                    type: types[i],
+                    description: descriptions[i],
+                    amount: parseFloat(amounts[i])
+                };
+                newTransactions.push(transaction);
+            }
+              appData.transactions.push(...newTransactions);
+            if (isGoogleSheetsMode) {
+                google.script.run
+                    .withSuccessHandler(function(response) {
+                        // เมื่อสำเร็จ อัปเดต UI และแสดงข้อความ
+                        $('#transactionCards').empty();
+                        addTransactionCard();
+                        updateDashboard();
+                        loadTransactionHistory();
+                        populateDashboardMonths();
+                        Swal.fire('สำเร็จ!', 'บันทึกรายการเรียบร้อยแล้ว', 'success');
+                    })
+                    .withFailureHandler(function(error) {
+                        console.error('❌ Error saving transactions:', error);
 
-              const newTransactions = [];
+                        // *** QA Refactor Point: Rollback on Failure ***
+                        // หากบันทึกไม่สำเร็จ, ลบข้อมูลที่เพิ่มเข้าไปชั่วคราวออกจาก appData
+                        const idsToRemove = new Set(newTransactions.map(t => t.id));
+                        appData.transactions = appData.transactions.filter(t => !idsToRemove.has(t.id));
 
-              for (let i = 0; i < dates.length; i++) {
-                  const transaction = {
-                      id: Date.now() + i,
-                      date: dates[i],
-                      category: categories[i],
-                      type: types[i],
-                      description: descriptions[i],
-                      amount: parseFloat(amounts[i])
-                  };
-                  newTransactions.push(transaction);
-                  appData.transactions.push(transaction); // เพิ่มเข้า memory
-              }
-
-              if (isGoogleSheetsMode) {
-                  google.script.run
-                      .withSuccessHandler(function(response) {
-
-                          $('#transactionCards').empty();
-                          addTransactionCard();
-                          updateDashboard();
-                          loadTransactionHistory();
-                          populateDashboardMonths();
-
-                          Swal.fire({
-                              icon: 'success',
-                              title: 'สำเร็จ',
-                              text: 'บันทึกรายการเรียบร้อยแล้ว'
-                          });
-                      })
-                      .withFailureHandler(function(error) {
-                          console.error('❌ Error saving transactions:', error);
-                          Swal.fire({
-                              icon: 'error',
-                              title: 'ข้อผิดพลาด',
-                              text: 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองอีกครั้ง'
-                          });
-                      })
-                      .saveMultipleTransactions(newTransactions); // เรียก Apps Script
-              } else {
-                  // Local mode
-                  saveData();
-                  $('#transactionCards').empty();
-                  addTransactionCard();
-                  updateDashboard();
-                  loadTransactionHistory();
-                  populateDashboardMonths();
-
-                  Swal.fire({
-                      icon: 'success',
-                      title: 'สำเร็จ',
-                      text: 'บันทึกรายการเรียบร้อยแล้ว'
-                  });
-              }
-          });
-      }
+                        Swal.fire('เกิดข้อผิดพลาด!', 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองอีกครั้ง', 'error');
+                    })
+                    .saveMultipleTransactions(newTransactions);
+            } else {
+                // Local mode
+                saveData(); // บันทึกลง localStorage
+                $('#transactionCards').empty();
+                addTransactionCard();
+                updateDashboard();
+                loadTransactionHistory();
+                populateDashboardMonths();
+                Swal.fire('สำเร็จ!', 'บันทึกรายการเรียบร้อยแล้ว (โหมดออฟไลน์)', 'success');
+            }
+        });
+    }
 
 
         function copyLastMonthData() {
@@ -701,23 +744,23 @@
                 const typeText = category.type === 'income' ? 'รายรับ' : 'รายจ่าย';
                 const typeClass = category.type === 'income' ? 'success' : 'danger';
 
-                return `
-                    <div class="card mb-2">
-                        <div class="card-body d-flex justify-content-between align-items-center">
-                            <div class="d-flex align-items-center">
-                                <div class="me-3" style="width: 20px; height: 20px; background-color: ${category.color}; border-radius: 50%;"></div>
-                                <div>
-                                    <strong>${category.name}</strong>
-                                    <br><small class="text-${typeClass}">${typeText}</small>
-                                </div>
-                            </div>
-                            <button class="btn btn-danger btn-sm" onclick="deleteCategory(${category.id})">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
+    return `
+        <div class="card mb-2">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <div class="me-3" style="width: 20px; height: 20px; background-color: ${category.color}; border-radius: 50%;"></div>
+                    <div>
+                        <strong>${category.name}</strong>
+                        <br><small class="text-${typeClass}">${typeText}</small>
                     </div>
-                `;
-            }
+                </div>
+                <button class="btn btn-danger btn-sm" onclick="deleteCategory(${category.id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    `;
+}
 
             incomeCategories.forEach(category => {
                 incomeList.append(createCategoryCard(category));
@@ -1035,141 +1078,178 @@
             updateExpenseChart();
         }
 
-        function updateBudgetChart() {
-            const selectedMonth = $('#dashboardMonth').val() || new Date().toISOString().slice(0, 7);
-            const currentBudgets = appData.budgets[selectedMonth] || [];
-            const expenseCategories = appData.categories.filter(cat => cat.type === 'expense');
-            
-            const labels = [];
-            const budgetData = [];
-            const actualData = [];
-            
-            expenseCategories.forEach(category => {
-                const budget = currentBudgets.find(b => b.categoryId === category.id);
-                const budgetAmount = budget ? budget.amount : 0;
-                
-                const actualAmount = appData.transactions
-                    .filter(t => t.date.startsWith(selectedMonth) && t.category === category.name && t.type === 'expense')
-                    .reduce((sum, t) => sum + t.amount, 0);
-                
-                if (budgetAmount > 0 || actualAmount > 0) {
-                    labels.push(category.name);
-                    budgetData.push(budgetAmount);
-                    actualData.push(actualAmount);
-                }
-            });
-            
-            const ctx = document.getElementById('budgetChart').getContext('2d');
-            
-            if (charts.budget) {
-                charts.budget.destroy();
-            }
-            
-            charts.budget = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'งบประมาณ',
-                            data: budgetData,
-                            backgroundColor: 'rgba(66, 165, 245, 0.7)',
-                            borderColor: 'rgba(66, 165, 245, 1)',
-                            borderWidth: 1
-                        },
-                        {
-                            label: 'ใช้จริง',
-                            data: actualData,
-                            backgroundColor: 'rgba(245, 66, 66, 0.7)',
-                            borderColor: 'rgba(245, 66, 66, 1)',
-                            borderWidth: 1
-                        }
-                    ]
+function updateBudgetChart() {
+    const selectedMonth = $('#dashboardMonth').val() || new Date().toISOString().slice(0, 7);
+    const currentBudgets = appData.budgets[selectedMonth] || [];
+    const expenseCategories = appData.categories.filter(cat => cat.type === 'expense');
+    
+    const labels = [];
+    const budgetData = [];
+    const actualData = [];
+    
+    expenseCategories.forEach(category => {
+        const budget = currentBudgets.find(b => b.categoryId === category.id);
+        const budgetAmount = budget ? budget.amount : 0;
+        
+        const actualAmount = appData.transactions
+            .filter(t => t.date.startsWith(selectedMonth) && t.category === category.name && t.type === 'expense')
+            .reduce((sum, t) => sum + t.amount, 0);
+        
+        if (budgetAmount > 0 || actualAmount > 0) {
+            labels.push(category.name);
+            budgetData.push(budgetAmount);
+            actualData.push(actualAmount);
+        }
+    });
+
+    // --- ส่วนที่เพิ่ม/แก้ไขสำหรับ Dark Mode ---
+    const isDarkMode = $('body').attr('data-theme') === 'dark';
+    const chartTextColor = isDarkMode ? '#c9d1d9' : '#4a4a4a';
+    const gridColor = isDarkMode ? 'rgba(201, 209, 217, 0.2)' : 'rgba(0, 0, 0, 0.1)';
+    // ------------------------------------
+    
+    const ctx = document.getElementById('budgetChart').getContext('2d');
+    
+    if (charts.budget) {
+        charts.budget.destroy();
+    }
+    
+    charts.budget = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'งบประมาณ',
+                    data: budgetData,
+                    backgroundColor: 'rgba(66, 165, 245, 0.7)',
+                    borderColor: 'rgba(66, 165, 245, 1)',
+                    borderWidth: 1
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return '฿' + value.toLocaleString();
-                                }
-                            }
+                {
+                    label: 'ใช้จริง',
+                    data: actualData,
+                    backgroundColor: 'rgba(245, 66, 66, 0.7)',
+                    borderColor: 'rgba(245, 66, 66, 1)',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            // --- ส่วนที่เพิ่ม/แก้ไขสำหรับ Dark Mode ---
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: chartTextColor, // กำหนดสีตัวอักษรแกน Y
+                        callback: function(value) {
+                            return '฿' + value.toLocaleString();
                         }
                     },
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return context.dataset.label + ': ฿' + context.parsed.y.toLocaleString();
-                                }
-                            }
-                        }
+                    grid: {
+                        color: gridColor // กำหนดสีเส้น Grid ของแกน Y
                     }
-                }
-            });
-        }
-
-
-        function updateIncomeChart() {
-            const selectedMonth = $('#dashboardMonth').val() || new Date().toISOString().slice(0, 7);
-
-            const incomeTransactions = appData.transactions.filter(t => 
-                t.date.startsWith(selectedMonth) && t.type === 'income'
-            );
-
-            const categoryTotals = {};
-            const categoryColors = {};
-
-            incomeTransactions.forEach(transaction => {
-                if (!categoryTotals[transaction.category]) {
-                    categoryTotals[transaction.category] = 0;
-                    const category = appData.categories.find(cat => cat.name === transaction.category);
-                    categoryColors[transaction.category] = category ? category.color : '#66bb6a'; // default สีเขียว
-                }
-                categoryTotals[transaction.category] += transaction.amount;
-            });
-
-            const labels = Object.keys(categoryTotals);
-            const data = Object.values(categoryTotals);
-            const colors = labels.map(label => categoryColors[label]);
-
-            const ctx = document.getElementById('incomeChart').getContext('2d');
-
-            if (charts.income) {
-                charts.income.destroy();
-            }
-
-            charts.income = new Chart(ctx, {
-                type: 'pie',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: data,
-                        backgroundColor: colors,
-                        borderColor: colors.map(color => color + 'FF'),
-                        borderWidth: 2
-                    }]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                    const percentage = ((context.parsed / total) * 100).toFixed(1);
-                                    return `${context.label}: ฿${context.parsed.toLocaleString()} (${percentage}%)`;
-                                }
-                            }
+                x: {
+                     ticks: {
+                        color: chartTextColor // กำหนดสีตัวอักษรแกน X
+                    },
+                    grid: {
+                        color: gridColor // กำหนดสีเส้น Grid ของแกน X
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: {
+                        color: chartTextColor // กำหนดสีตัวอักษรของ Legend
+                    }
+                },
+            // ------------------------------------
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ฿' + context.parsed.y.toLocaleString();
                         }
                     }
                 }
-            });
+            }
         }
+    });
+}
+
+
+function updateIncomeChart() {
+    const selectedMonth = $('#dashboardMonth').val() || new Date().toISOString().slice(0, 7);
+
+    const incomeTransactions = appData.transactions.filter(t => 
+        t.date.startsWith(selectedMonth) && t.type === 'income'
+    );
+
+    const categoryTotals = {};
+    const categoryColors = {};
+
+    incomeTransactions.forEach(transaction => {
+        if (!categoryTotals[transaction.category]) {
+            categoryTotals[transaction.category] = 0;
+            const category = appData.categories.find(cat => cat.name === transaction.category);
+            categoryColors[transaction.category] = category ? category.color : '#66bb6a'; // default สีเขียว
+        }
+        categoryTotals[transaction.category] += transaction.amount;
+    });
+
+    const labels = Object.keys(categoryTotals);
+    const data = Object.values(categoryTotals);
+    const colors = labels.map(label => categoryColors[label]);
+
+    // --- ส่วนที่เพิ่ม/แก้ไขสำหรับ Dark Mode ---
+    const isDarkMode = $('body').attr('data-theme') === 'dark';
+    const chartTextColor = isDarkMode ? '#c9d1d9' : '#4a4a4a';
+    // ------------------------------------
+
+    const ctx = document.getElementById('incomeChart').getContext('2d');
+
+    if (charts.income) {
+        charts.income.destroy();
+    }
+
+    charts.income = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: colors,
+                borderColor: colors.map(color => color + 'FF'),
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                // --- ส่วนที่เพิ่ม/แก้ไขสำหรับ Dark Mode ---
+                legend: {
+                    labels: {
+                        color: chartTextColor // กำหนดสีตัวอักษรของ Legend
+                    }
+                },
+                // ------------------------------------
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((context.parsed / total) * 100).toFixed(1);
+                            return `${context.label}: ฿${context.parsed.toLocaleString()} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
 
 
         function updateExpenseChart() {
@@ -1362,66 +1442,62 @@
             loadTransactionHistory();
         });
 
-        function deleteTransaction(transactionId) {
-          Swal.fire({
-              title: 'ยืนยันการลบ',
-              text: 'คุณต้องการลบรายการนี้ใช่หรือไม่?',
-              icon: 'warning',
-              showCancelButton: true,
-              confirmButtonText: 'ลบ',
-              cancelButtonText: 'ยกเลิก'
-          }).then((result) => {
-              if (!result.isConfirmed) return;
+    /**
+     * @name deleteTransaction
+     * @description ลบรายการธุรกรรม
+     * @param {number} transactionId - ID ของรายการที่ต้องการลบ
+     * QA Refactor:
+     * - เก็บข้อมูลรายการที่จะลบไว้ชั่วคราว
+     * - หากการลบที่ Backend ล้มเหลว จะนำข้อมูลกลับคืนสู่ appData (Rollback)
+     */
+    function deleteTransaction(transactionId) {
+        Swal.fire({
+            title: 'ยืนยันการลบ',
+            text: 'คุณต้องการลบรายการนี้ใช่หรือไม่?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'ลบ',
+            cancelButtonText: 'ยกเลิก'
+        }).then((result) => {
+            if (!result.isConfirmed) return;
 
-              // ลบออกจาก memory ทันที
-              appData.transactions = appData.transactions.filter(t => t.id !== transactionId);
+            // *** QA Refactor Point: Backup for Rollback ***
+            const transactionToDelete = appData.transactions.find(t => t.id === transactionId);
+            const transactionIndex = appData.transactions.findIndex(t => t.id === transactionId);
+            if (!transactionToDelete) return; // ไม่พบรายการที่จะลบ
 
-              if (isGoogleSheetsMode) {
-                Swal.fire({
-                  title: 'กำลังลบข้อมูล...',
-                  allowOutsideClick: false,
-                  showConfirmButton: false
-                });
+            // ลบออกจาก Memory ชั่วคราว (Optimistic UI)
+            appData.transactions.splice(transactionIndex, 1);
+            
+            // อัปเดตตารางทันทีเพื่อให้ผู้ใช้เห็นผลลัพธ์
+            loadTransactionHistory();
 
-                Swal.showLoading();
+            if (isGoogleSheetsMode) {
+                Swal.fire({ title: 'กำลังลบ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                
+                google.script.run
+                    .withSuccessHandler(function(response) {
+                        updateDashboard(); // อัปเดต Dashboard หลังลบสำเร็จ
+                        Swal.fire('สำเร็จ!', 'ลบรายการเรียบร้อยแล้ว', 'success');
+                    })
+                    .withFailureHandler(function(error) {
+                        console.error('❌ Error deleting transaction:', error);
 
-                  google.script.run
-                      .withSuccessHandler(function(response) {
+                        // *** QA Refactor Point: Rollback on Failure ***
+                        // หากลบไม่สำเร็จ, นำข้อมูลที่สำรองไว้กลับคืนสู่ตำแหน่งเดิม
+                        appData.transactions.splice(transactionIndex, 0, transactionToDelete);
+                        loadTransactionHistory(); // โหลดตารางใหม่เพื่อแสดงข้อมูลที่กลับมา
 
-                          // อัปเดต UI หลังลบ
-                          loadTransactionHistory();
-                          updateDashboard();
-
-                          Swal.fire({
-                              icon: 'success',
-                              title: 'สำเร็จ',
-                              text: 'ลบรายการเรียบร้อยแล้ว'
-                          });
-                      })
-                      .withFailureHandler(function(error) {
-                          console.error('❌ Error deleting transaction:', error);
-
-                          Swal.fire({
-                              icon: 'error',
-                              title: 'ข้อผิดพลาด',
-                              text: 'ไม่สามารถลบรายการได้ กรุณาลองอีกครั้ง'
-                          });
-                      })
-                      .deleteTransaction(transactionId); // เรียก Apps Script
-              } else {
-                  // Local mode
-                  saveData();
-                  loadTransactionHistory();
-                  updateDashboard();
-
-                  Swal.fire({
-                      icon: 'success',
-                      title: 'สำเร็จ',
-                      text: 'ลบรายการเรียบร้อยแล้ว'
-                  });
-              }
-          });
-      }
+                        Swal.fire('เกิดข้อผิดพลาด!', 'ไม่สามารถลบรายการได้', 'error');
+                    })
+                    .deleteTransaction(transactionId);
+            } else {
+                saveData();
+                updateDashboard();
+                Swal.fire('สำเร็จ!', 'ลบรายการเรียบร้อยแล้ว (โหมดออฟไลน์)', 'success');
+            }
+        });
+    }
 
 
         // Year Summary Chart
