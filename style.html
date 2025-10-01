@@ -25,6 +25,49 @@
         --border-radius: 12px; /* รัศมีความโค้งของขอบ */
     }
 
+/* ======================================= */
+/* Mobile: Budget Page Controls Final Fix  */
+/* ======================================= */
+@media (max-width: 768px) {
+    
+    h4 {
+        font-size: 1.1rem; /* ใช้ rem เพื่อความยืดหยุ่น หรือใช้ 16px ก็ได้ครับ */
+    }
+    /*
+     * เลือกเป้าหมายไปที่ div ที่ครอบส่วนควบคุมทั้งหมด
+     * และสั่งให้ item ภายในสามารถขึ้นบรรทัดใหม่ได้
+    */
+    #budget .card-body .d-flex.align-items-center {
+        flex-wrap: wrap;
+        gap: 1rem; /* เพิ่มระยะห่างระหว่างส่วนต่างๆ */
+    }
+
+    /*
+     * จัดการกลุ่มตัวเลือก เดือน/ปี ให้แสดงผลเต็มความกว้าง
+    */
+    #budget .month-year-selector {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    /*
+     * จัดการปุ่ม 'คัดลอก' ให้แสดงผลเต็มความกว้าง
+     * และเอา margin ด้านซ้ายที่เคยดันปุ่มไปทางขวาออก
+    */
+    #budget .btn-info {
+        margin-left: 0 !important;
+        width: 100%;
+    }
+    #budgetTableBody td {
+    vertical-align: middle;
+}
+}
+
+    #budget .btn-info {
+        margin-left: 0 !important;
+        width: 100%;
+    }
+
 /*
   กำหนด CSS Variables และสไตล์ทั้งหมดสำหรับ Dark Mode
   เมื่อ <body> มี attribute data-theme="dark" สไตล์เหล่านี้จะถูกใช้งาน
@@ -255,13 +298,4 @@
         margin: 15px 0;
     }
     
-    /* Responsive design for mobile */
-    @media (max-width: 768px) {
-        .chart-container {
-            height: 300px;
-        }
-        .navbar-nav {
-            text-align: center;
-        }
-    }
 </style>
