@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- DataTables CSS -->
+    <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <!-- SweetAlert2 -->
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <?!= include('style'); ?>        
+
+</head>
+<body>
+    <!-- Header Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#"><i class="fas fa-wallet me-2"></i>บันทึกรายรับ-รายจ่าย</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" onclick="showSection('dashboard')">
+                            <i class="fas fa-chart-pie me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showSection('transactions')">
+                            <i class="fas fa-plus-circle me-1"></i>บันทึกรายการ
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showSection('categories')">
+                            <i class="fas fa-tags me-1"></i>จัดการหมวดหมู่
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showSection('budget')">
+                            <i class="fas fa-calculator me-1"></i>ตั้งงบประมาณ
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showSection('settings')">
+                            <i class="fas fa-cog me-1"></i>การตั้งค่า
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <h4 class="mt-3 text-white">กำลังโหลดข้อมูล...</h4>
+            <p class="text-white-50" id="loadingStatus">กำลังเชื่อมต่อกับ Google Sheets</p>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container main-content loading">
+        <!-- Dashboard Section -->
+        <div id="dashboard" class="section active">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h2 class="text-center mb-4"><i class="fas fa-chart-line me-2"></i>Dashboard</h2>
+                    <div class="text-center mb-4">
+                        <div class="month-selector d-inline-block">
+                            <label class="form-label me-2">เลือกเดือน:</label>
+                            <select class="form-select d-inline-block" id="dashboardMonth" style="width: auto;" onchange="updateDashboard()">
+                                <!-- Options will be populated by JavaScript -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Summary Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3 mb-3">
+                    <div class="card stat-card income-card">
+                        <div class="card-body text-center">
+                            <i class="fas fa-arrow-up fa-2x text-success mb-2"></i>
+                            <h5>รายรับรวม</h5>
+                            <h3 class="text-success" id="totalIncome">฿0</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card stat-card expense-card">
+                        <div class="card-body text-center">
+                            <i class="fas fa-arrow-down fa-2x text-danger mb-2"></i>
+                            <h5>รายจ่ายรวม</h5>
+                            <h3 class="text-danger" id="totalExpense">฿0</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card stat-card balance-card">
+                        <div class="card-body text-center">
+                            <i class="fas fa-balance-scale fa-2x text-warning mb-2"></i>
+                            <h5>ยอดคงเหลือ</h5>
+                            <h3 class="text-warning" id="balance">฿0</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card stat-card">
+                        <div class="card-body text-center">
+                            <i class="fas fa-calendar fa-2x text-primary mb-2"></i>
+                            <h5>เดือนปัจจุบัน</h5>
+                            <h3 class="text-primary" id="currentMonth"></h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="row">
+              <div class="col-lg-6 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>สัดส่วนรายรับ</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="incomeChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>สัดส่วนรายจ่าย</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="expenseChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-12 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>งบประมาณ vs ใช้จริง</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="budgetChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+
+            <!-- Progress Bars -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-tasks me-2"></i>ความคืบหน้างบประมาณ</h5>
+                        </div>
+                        <div class="card-body" id="budgetProgress">
+                            <!-- Progress bars will be generated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Year Summary -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card year-summary-card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>สรุปรายปี <span id="currentYear"></span></h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="yearSummaryChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transactions Section -->
+        <div id="transactions" class="section">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h2 class="text-center mb-4"><i class="fas fa-plus-circle me-2"></i>บันทึกรายรับ-รายจ่าย</h2>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">เพิ่มรายการใหม่</h5>
+                    <div>
+                        <button class="btn btn-success btn-sm" onclick="addTransactionCard()">
+                            <i class="fas fa-plus me-1"></i>เพิ่มรายการ
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form id="transactionForm">
+                        <div id="transactionCards">
+                            <!-- Transaction cards will be added here -->
+                        </div>
+                        <div class="text-center mt-3">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save me-2"></i>บันทึกทั้งหมด
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Transaction History -->
+            <div class="card mt-4">
+              <div class="card-header">
+                  <h5 class="mb-0"><i class="fas fa-history me-2"></i>ประวัติรายการ</h5>
+              </div>
+              <div class="card-body">
+
+                  <div class="row mb-3">
+                      <div class="col-md-3">
+                          <label for="filterCategory" class="form-label">หมวดหมู่</label>
+                          <select id="filterCategory" class="form-select">
+                              <option value="">-- ทั้งหมด --</option>
+                          </select>
+                      </div>
+                      <div class="col-md-3">
+                          <label for="filterStartDate" class="form-label">วันที่เริ่มต้น</label>
+                          <input type="date" id="filterStartDate" class="form-control">
+                      </div>
+                      <div class="col-md-3">
+                          <label for="filterEndDate" class="form-label">วันที่สิ้นสุด</label>
+                          <input type="date" id="filterEndDate" class="form-control">
+                      </div>
+                      <div class="col-md-3 d-flex align-items-end">
+                          <button class="btn btn-secondary w-100" id="resetFilter">
+                              <i class="fas fa-undo"></i> รีเซ็ตตัวกรอง
+                          </button>
+                      </div>
+                  </div>
+
+                  <div class="table-responsive">
+                      <table class="table table-striped" id="historyTable">
+                          <thead>
+                              <tr>
+                                  <th>วันที่</th>
+                                  <th>หมวดหมู่</th>
+                                  <th>ประเภท</th>
+                                  <th>รายละเอียด</th>
+                                  <th>จำนวนเงิน</th>
+                                  <th>จัดการ</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              <!-- Data will be loaded here -->
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          </div>
+
+        </div>
+
+        <!-- Categories Section -->
+        <div id="categories" class="section">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h2 class="text-center mb-4"><i class="fas fa-tags me-2"></i>จัดการหมวดหมู่</h2>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-6 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">เพิ่มหมวดหมู่ใหม่</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="categoryForm">
+                                <div class="mb-3">
+                                    <label class="form-label">ชื่อหมวดหมู่</label>
+                                    <input type="text" class="form-control" id="categoryName" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">ประเภท</label>
+                                    <select class="form-select" id="categoryType" required>
+                                        <option value="">เลือกประเภท</option>
+                                        <option value="income">รายรับ</option>
+                                        <option value="expense">รายจ่าย</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">สีประจำหมวดหมู่</label>
+                                    <input type="color" class="form-control form-control-color" id="categoryColor" value="#42a5f5">
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-plus me-1"></i>เพิ่มหมวดหมู่
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                  <div class="card">
+                      <div class="card-header">
+                          <h5 class="mb-0">รายการหมวดหมู่</h5>
+                      </div>
+                      <div class="card-body">
+                          <!-- ส่วนของรายรับ -->
+                          <h6 class="text-success mb-2">รายรับ</h6>
+                          <div id="incomeList" class="mb-3">
+                              <!-- รายรับจะแสดงตรงนี้ -->
+                          </div>
+
+                          <hr>
+
+                          <!-- ส่วนของรายจ่าย -->
+                          <h6 class="text-danger mb-2">รายจ่าย</h6>
+                          <div id="expenseList">
+                              <!-- รายจ่ายจะแสดงตรงนี้ -->
+                          </div>
+                      </div>
+                  </div>
+              </div>
+
+            </div>
+        </div>
+
+        <!-- Budget Section -->
+        <div id="budget" class="section">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h2 class="text-center mb-4"><i class="fas fa-calculator me-2"></i>ตั้งงบประมาณรายเดือน</h2>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <h5 class="mb-0">ตั้งงบประมาณรายเดือน</h5>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-end align-items-center gap-2">
+                                <div class="month-year-selector d-flex align-items-center gap-2">
+                                    <label class="form-label mb-0 text-white">เดือน:</label>
+                                    <select class="form-select form-select-sm" id="budgetMonthSelect" style="width: auto;" onchange="loadBudgetForm()">
+                                        <!-- Options will be populated by JavaScript -->
+                                    </select>
+                                    <label class="form-label mb-0 text-white">ปี:</label>
+                                    <select class="form-select form-select-sm" id="budgetYearSelect" style="width: auto;" onchange="loadBudgetForm()">
+                                        <!-- Options will be populated by JavaScript -->
+                                    </select>
+                                </div>
+                                <button class="btn btn-info btn-sm" onclick="copyLastMonthBudget()">
+                                    <i class="fas fa-copy me-1"></i>คัดลอกงบเดือนก่อน
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form id="budgetForm">
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead class="table-primary">
+                                    <tr>
+                                        <th>หมวดหมู่</th>
+                                        <th width="150">งบประมาณ</th>
+                                        <th width="150">ใช้จริง</th>
+                                        <th width="150">คงเหลือ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="budgetTableBody">
+                                    <!-- Budget rows will be generated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="text-center mt-3">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save me-2"></i>บันทึกงบประมาณ
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Section -->
+        <div id="settings" class="section">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h2 class="text-center mb-4"><i class="fas fa-cog me-2"></i>การตั้งค่า</h2>
+                </div>
+            </div>
+
+            <div class="row justify-content-center">
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">จัดการข้อมูล</h5>
+                        </div>
+                        <div class="card-body text-center">
+                            <div class="mb-4">
+                                <i class="fas fa-database fa-3x text-primary mb-3"></i>
+                                <p class="text-muted">ล้างข้อมูลทั้งหมดในระบบ</p>
+                            </div>
+                            <button class="btn btn-danger btn-lg" onclick="clearAllData()">
+                                <i class="fas fa-trash-alt me-2"></i>ล้างข้อมูลทั้งหมด
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p class="mb-0">&copy; 2025 บันทึกรายรับ-รายจ่าย | พัฒนาโดย ครูพสุวัฒน์ Online <a class="text-white" href="https://www.facebook.com/pasuwat.loekrattanapratip/" target="_blank"><i class="fa-brands fa-facebook"></i></a> <a class="text-white" href="https://www.youtube.com/channel/UCpcViWnGYPFpU869gMf41Ng?sub_confirmation=1" target="_blank"><i class="fa-brands fa-youtube"></i></a></p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <?!= include('JavaScript'); ?>    
+</body>
+</html>
