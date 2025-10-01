@@ -319,50 +319,50 @@
             </div>
         </div>
 
-        <div id="budget" class="section">
-             <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
+<div id="budget" class="section">
+              <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
                  <h4 class="mb-0 fw-bold"><i class="fas fa-calculator me-2 text-primary"></i>ตั้งงบประมาณรายเดือน</h4>
-                 <div class="d-flex align-items-center gap-2">
-                     <div class="month-year-selector d-flex align-items-center gap-2">
-                         <label class="form-label mb-0">เดือน:</label>
-                         <select class="form-select form-select-sm" id="budgetMonthSelect" style="width: auto;" onchange="loadBudgetForm()">
-                             </select>
-                         <label class="form-label mb-0">ปี:</label>
-                         <select class="form-select form-select-sm" id="budgetYearSelect" style="width: auto;" onchange="loadBudgetForm()">
-                             </select>
-                     </div>
-                     <button class="btn btn-info btn-sm" onclick="copyLastMonthBudget()">
-                         <i class="fas fa-copy me-1"></i>คัดลอก
-                     </button>
-                 </div>
             </div>
+    <div class="card mt-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <button class="btn btn-info btn-sm text-nowrap" onclick="copyLastMonthBudget()">
+                <i class="fas fa-copy me-1"></i>คัดลอก
+            </button>
+        </div>
 
-            <div class="card">
-                <div class="card-body">
-                    <form id="budgetForm">
-                        <div class="table-responsive">
-                            <table class="table table-bordered">
-                                <thead class="table-primary">
-                                    <tr>
-                                        <th>หมวดหมู่</th>
-                                        <th width="150">งบประมาณ</th>
-                                        <th width="150">ใช้จริง</th>
-                                        <th width="150">คงเหลือ</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="budgetTableBody">
-                                    </tbody>
-                            </table>
-                        </div>
-                        <div class="text-center mt-3">
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="fas fa-save me-2"></i>บันทึกงบประมาณ
-                            </button>
-                        </div>
-                    </form>
+        <div class="card-body">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <div class="month-year-selector d-flex align-items-center gap-2">
+                    <label class="form-label mb-0 text-nowrap">เดือน:</label>
+                    <select class="form-select form-select-sm" id="budgetMonthSelect" onchange="loadBudgetForm()"></select>
+                    <label class="form-label mb-0 text-nowrap">ปี:</label>
+                    <select class="form-select form-select-sm" id="budgetYearSelect" onchange="loadBudgetForm()"></select>
                 </div>
             </div>
+
+            <form id="budgetForm">
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>หมวดหมู่</th>
+                                <th width="150">งบประมาณ</th>
+                                <th width="150">ใช้จริง</th>
+                                <th width="150">คงเหลือ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="budgetTableBody"></tbody>
+                    </table>
+                </div>
+                <div class="text-center mt-3">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-save me-2"></i>บันทึกงบประมาณ
+                    </button>
+                </div>
+            </form>
         </div>
+    </div>
+</div>
 
         <div id="settings" class="section">
             <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
