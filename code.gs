@@ -5,9 +5,8 @@ const SHEET_NAME = 'FinanceData';
 const TRANSACTIONS_SHEET = 'Transactions';
 const CATEGORIES_SHEET = 'Categories';
 const BUDGETS_SHEET = 'Budgets';
-const ACCOUNTS_SHEET = 'Accounts'; // ใหม่: ชีตบัญชี
-const TRANSFERS_SHEET = 'Transfers'; // ใหม่: ชีตการโอน
-const TAX_SHEET = 'Tax'; // ใหม่: ชีตภาษี
+const ACCOUNTS_SHEET = 'Accounts'; // ชีตบัญชี
+const TAX_SHEET = 'Tax'; // ชีตภาษี
 
 function doGet() {
   let html = HtmlService.createTemplateFromFile('index').evaluate()
@@ -17,7 +16,7 @@ function doGet() {
   return html;
 }
 
-function getURL(){
+function getURL() {
   return ScriptApp.getService().getUrl();
 }
 
@@ -31,13 +30,12 @@ function include(filename) {
  */
 function initializeSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  // --- Transactions Sheet ---
+  // --- Transactions Sheet (ปรับปรุงใหม่) ---
   let transactionsSheet = ss.getSheetByName(TRANSACTIONS_SHEET);
   if (!transactionsSheet) {
     transactionsSheet = ss.insertSheet(TRANSACTIONS_SHEET);
-    // เพิ่ม AccountID เพื่อผูกรายการกับบัญชี
-    const headers = [['ID', 'Date', 'Category', 'Type', 'Amount', 'Description', 'AccountID']];
+    // เพิ่ม FromAccountID และ ToAccountID สำหรับการโอนเงิน
+    const headers = [['ID', 'Date', 'Category', 'Type', 'Amount', 'Description', 'AccountID', 'FromAccountID', 'ToAccountID']];
     transactionsSheet.getRange(1, 1, 1, headers[0].length).setValues(headers).setFontWeight('bold');
   }
 
@@ -55,7 +53,7 @@ function initializeSheets() {
     budgetsSheet.getRange(1, 1, 1, 3).setValues([['MonthYear', 'CategoryID', 'Amount']]).setFontWeight('bold');
   }
 
-  // --- Accounts Sheet (ใหม่) ---
+  // --- Accounts Sheet ---
   let accountsSheet = ss.getSheetByName(ACCOUNTS_SHEET);
   if (!accountsSheet) {
     accountsSheet = ss.insertSheet(ACCOUNTS_SHEET);
@@ -63,21 +61,20 @@ function initializeSheets() {
     accountsSheet.getRange(1, 1, 1, headers[0].length).setValues(headers).setFontWeight('bold');
   }
 
-  // --- Transfers Sheet (ใหม่) ---
-  let transfersSheet = ss.getSheetByName(TRANSFERS_SHEET);
-  if (!transfersSheet) {
-    transfersSheet = ss.insertSheet(TRANSFERS_SHEET);
-    const headers = [['ID', 'Date', 'FromAccountID', 'ToAccountID', 'Amount', 'Description']];
-    transfersSheet.getRange(1, 1, 1, headers[0].length).setValues(headers).setFontWeight('bold');
-  }
-
-  // --- Tax Sheet (ใหม่) ---
+  // --- Tax Sheet ---
   let taxSheet = ss.getSheetByName(TAX_SHEET);
   if (!taxSheet) {
     taxSheet = ss.insertSheet(TAX_SHEET);
     const headers = [['Year', 'TotalIncome', 'DeductibleExpenses', 'TaxPaid']];
     taxSheet.getRange(1, 1, 1, headers[0].length).setValues(headers).setFontWeight('bold');
   }
+
+  // นำ Transfers Sheet ออก
+  const transferSheet = ss.getSheetByName('Transfers');
+  if (transferSheet) {
+    ss.deleteSheet(transferSheet);
+  }
+
 
   return 'Sheets initialized successfully';
 }
@@ -166,53 +163,9 @@ function updateAccount(account) {
 }
 
 // ==================================================================
-//  TRANSFER FUNCTIONS
+//  TRANSFER FUNCTIONS (ถูกลบออก)
 // ==================================================================
-function saveTransfer(transfer) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(TRANSFERS_SHEET);
-    const id = transfer.id || new Date().getTime();
-
-    const newRow = [
-      id,
-      transfer.date,
-      transfer.from,
-      transfer.to,
-      transfer.amount,
-      transfer.description || ''
-    ];
-    sheet.appendRow(newRow);
-    return { success: true, id: id };
-  } catch (error) {
-    return { success: false, error: error.toString() };
-  }
-}
-
-function getAllTransfers() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(TRANSFERS_SHEET);
-    if (!sheet) return [];
-    const data = sheet.getDataRange().getValues();
-    if (data.length <= 1) return [];
-
-    const transfers = [];
-    for (let i = 1; i < data.length; i++) {
-      transfers.push({
-        id: data[i][0],
-        date: Utilities.formatDate(new Date(data[i][1]), Session.getScriptTimeZone(), 'yyyy-MM-dd'),
-        from: data[i][2],
-        to: data[i][3],
-        amount: parseFloat(data[i][4]) || 0,
-        description: data[i][5]
-      });
-    }
-    return transfers;
-  } catch (error) {
-    return [];
-  }
-}
+// ฟังก์ชัน saveTransfer และ getAllTransfers ถูกลบออกไปแล้ว
 
 // ==================================================================
 //  TAX FUNCTIONS
@@ -223,7 +176,6 @@ function saveTaxData(taxData) {
     const sheet = ss.getSheetByName(TAX_SHEET);
     const data = sheet.getDataRange().getValues();
     let recordFound = false;
-
     for (let i = 1; i < data.length; i++) {
       if (data[i][0] == taxData.year) {
         sheet.getRange(i + 1, 2, 1, 3).setValues([[
@@ -258,7 +210,6 @@ function getAllTaxData() {
 
         const data = sheet.getDataRange().getValues();
         if (data.length <= 1) return {};
-
         const taxRecords = {};
         for (let i = 1; i < data.length; i++) {
             taxRecords[data[i][0]] = {
@@ -278,34 +229,6 @@ function getAllTaxData() {
 /**
  * Transaction functions
  */
-function saveTransaction(transaction) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(TRANSACTIONS_SHEET);
-    
-    if (!sheet) {
-      initializeSheets();
-      sheet = ss.getSheetByName(TRANSACTIONS_SHEET);
-    }
-    
-    const id = transaction.id || new Date().getTime();
-    const newRow = [
-      id,
-      transaction.date,
-      transaction.category,
-      transaction.type,
-      transaction.amount,
-      transaction.description || '',
-      transaction.accountId || null
-    ];
-    
-    sheet.appendRow(newRow);
-    return { success: true, id: id };
-  } catch (error) {
-    return { success: false, error: error.toString() };
-  }
-}
-
 function saveMultipleTransactions(transactions) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -315,16 +238,18 @@ function saveMultipleTransactions(transactions) {
       sheet = ss.getSheetByName(TRANSACTIONS_SHEET);
     }
 
+    // ปรับปรุงให้รองรับโครงสร้างใหม่
     const rows = transactions.map(t => [
       t.id || new Date().getTime() + Math.random(),
       new Date(t.date),
-      t.category,
+      t.category || null, // Category เป็น null สำหรับ transfer
       t.type,
       t.amount,
       t.description || '',
-      t.accountId || null
+      t.accountId || null, // AccountID ปกติ
+      t.from || null,      // ID บัญชีต้นทาง (สำหรับ transfer)
+      t.to || null         // ID บัญชีปลายทาง (สำหรับ transfer)
     ]);
-
     if (rows.length > 0) {
       sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
     }
@@ -363,7 +288,9 @@ function getAllTransactions() {
         type: data[i][3],
         amount: data[i][4],
         description: data[i][5],
-        accountId: data[i][6]
+        accountId: data[i][6],
+        from: data[i][7], // อ่านข้อมูลใหม่
+        to: data[i][8]    // อ่านข้อมูลใหม่
       });
     }
 
@@ -536,7 +463,6 @@ function getAllBudgets() {
       let rawDate = data[i][0];
       let dateObj = (rawDate instanceof Date) ? rawDate : new Date(rawDate);
       if (isNaN(dateObj.getTime())) continue;
-
       const month = String(dateObj.getMonth() + 1).padStart(2, '0');
       const year = dateObj.getFullYear();
       const monthYear = `${year}-${month}`;
@@ -586,8 +512,8 @@ function deleteBudgetsByMonth(monthYear) {
 function clearAllData() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    
-    const sheetNames = [TRANSACTIONS_SHEET, BUDGETS_SHEET, CATEGORIES_SHEET, ACCOUNTS_SHEET, TRANSFERS_SHEET, TAX_SHEET];
+    // นำ TRANSFERS_SHEET ออก
+    const sheetNames = [TRANSACTIONS_SHEET, BUDGETS_SHEET, CATEGORIES_SHEET, ACCOUNTS_SHEET, TAX_SHEET];
     
     sheetNames.forEach(name => {
       const sheet = ss.getSheetByName(name);
@@ -595,7 +521,6 @@ function clearAllData() {
         sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clear();
       }
     });
-    
     return { success: true };
   } catch (error) {
     return { success: false, error: error.toString() };
@@ -608,20 +533,18 @@ function getAppData() {
     const categories = getAllCategories();
     const budgets = getAllBudgets();
     const accounts = getAllAccounts();
-    const transfers = getAllTransfers();
+    // const transfers = getAllTransfers(); // ลบออก
     const taxData = getAllTaxData();
-
     const data = {
       transactions: transactions || [],
       categories: categories || [],
       budgets: budgets || {},
       accounts: accounts || [],
-      transfers: transfers || [],
+      // transfers: transfers || [], // ลบออก
       taxData: taxData || {}
     };
 
     return data;
-
   } catch (error) {
     Logger.log('❌ Error in getAppData: ' + error);
     return {
@@ -629,7 +552,7 @@ function getAppData() {
       categories: [],
       budgets: {},
       accounts: [],
-      transfers: [],
+      // transfers: [], // ลบออก
       taxData: {}
     };
   }
