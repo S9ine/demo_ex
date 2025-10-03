@@ -72,6 +72,10 @@
   กำหนด CSS Variables และสไตล์ทั้งหมดสำหรับ Dark Mode
   เมื่อ <body> มี attribute data-theme="dark" สไตล์เหล่านี้จะถูกใช้งาน
 */
+[data-theme="dark"] .sticky-header {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
 [data-theme="dark"] #incomeList .card-body,
 [data-theme="dark"] #expenseList .card-body {
     /*
@@ -135,7 +139,17 @@
       - color: ใช้สีตัวอักษรจากตัวแปร
       - transition: ทำให้การเปลี่ยนสีพื้นหลัง (เมื่อสลับ theme) นุ่มนวลขึ้น
     */
+body::-webkit-scrollbar {
+    display: none;
+}
+
+/* สำหรับ Firefox */
+body {
+    scrollbar-width: none;
+}
+
     body {
+
         box-sizing: border-box;
         font-family: 'Prompt', sans-serif;
         background-color: var(--background-color);
@@ -387,6 +401,18 @@
 /* ======================================= */
 /* Dashboard Account List Styles           */
 /* ======================================= */
+.sticky-header {
+    position: sticky;
+    top: 0; /* ทำให้ติดที่ขอบบนสุดของพื้นที่เลื่อน */
+    background-color: var(--background-color); /* ใส่สีพื้นหลังเพื่อไม่ให้เนื้อหาข้างใต้ทะลุขึ้นมา */
+    z-index: 1000; /* ทำให้แสดงอยู่ชั้นบนสุดเสมอ */
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    /* เพิ่มเงาเล็กน้อยเพื่อแยกส่วนกับเนื้อหาข้างล่างตอนเลื่อน */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); 
+    margin-top: 0 !important; /* ยกเลิก margin-top เดิมเมื่อติดขอบ */
+}
+
 .account-card-small {
     background-color: var(--surface-color);
     border: 1px solid var(--border-color);
@@ -420,5 +446,55 @@
     border-top: 1px solid var(--border-color);
 }
 
+/* ======================================= */
+/* Bottom Mobile Navigation (ใหม่)         */
+/* ======================================= */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: var(--surface-color);
+    box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 10px 0;
+    z-index: 1050;
+    border-top: 1px solid var(--border-color);
+}
+.bottom-nav .nav-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: var(--text-muted-color);
+    font-size: 0.75rem;
+    font-weight: 500;
+    transition: color 0.3s ease;
+    text-decoration: none; /* เพิ่มเข้ามาเพื่อเอาเส้นใต้ออก */
+}
+.bottom-nav .nav-link i {
+    font-size: 1.5rem; /* ขนาดไอคอน */
+    margin-bottom: 4px;
+}
+.bottom-nav .nav-link.active,
+.bottom-nav .nav-link:hover {
+    color: var(--primary-color);
+}
+
+/* ปรับแก้ Body เพื่อไม่ให้ Content โดนเมนูล่างบัง */
+body {
+    padding-bottom: 80px; /* เพิ่มพื้นที่ด้านล่าง */
+}
+
+/* ซ่อน Navbar เดิม */
+.navbar {
+    display: none !important;
+}
+
+/* ปรับปุ่ม FAB ไม่ให้ชิดขอบเกินไป */
+.fab {
+    bottom: 90px;
+}
     
 </style>
