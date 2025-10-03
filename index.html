@@ -42,18 +42,7 @@
             <p class="text-white-50" id="loadingStatus">กำลังเชื่อมต่อ...</p>
         </div>
     </div>
-    <div id="pinOverlay" class="pin-overlay">
-        <div class="pin-container">
-            <i class="fas fa-lock fa-2x text-primary mb-3"></i>
-            <h4>กรุณากรอก PIN</h4>
-            <div id="pin-input-group" class="pin-input-group">
-                <input type="password" class="pin-input" maxlength="1"><input type="password" class="pin-input" maxlength="1"><input type="password" class="pin-input" maxlength="1"><input type="password" class="pin-input" maxlength="1">
-            </div>
-            <p id="pinErrorMessage" class="text-danger" style="display: none;">PIN ไม่ถูกต้อง</p>
-            <button id="forgotPinButton" class="btn btn-link">ลืม PIN?</button>
-        </div>
-    </div>
-
+    
     <div class="container main-content loading">
         
         <div id="dashboard" class="section active">
@@ -89,40 +78,16 @@
         </div>
 
         <div id="transactions" class="section">
-            <div class="d-flex justify-content-between align-items-center mb-4 mt-4"><h4 class="mb-0 fw-bold"><i class="fas fa-history me-2 text-primary"></i>ประวัติรายการ</h4></div>
-            <div class="card mt-4"><div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-md-3"><label for="filterCategory" class="form-label">หมวดหมู่</label><select id="filterCategory" class="form-select"><option value="">-- ทั้งหมด --</option></select></div>
-                    <div class="col-md-3"><label for="filterStartDate" class="form-label">วันที่เริ่มต้น</label><input type="date" id="filterStartDate" class="form-control"></div>
-                    <div class="col-md-3"><label for="filterEndDate" class="form-label">วันที่สิ้นสุด</label><input type="date" id="filterEndDate" class="form-control"></div>
-                    <div class="col-md-3 d-flex align-items-end"><button class="btn btn-secondary w-100" id="resetFilter"><i class="fas fa-undo"></i> รีเซ็ต</button></div>
+            <div class="d-flex justify-content-between align-items-center mb-4 mt-4 sticky-header">
+                <h4 class="mb-0 fw-bold"><i class="fas fa-history me-2 text-primary"></i>ประวัติรายการ</h4>
+                <div class="d-flex align-items-center">
+                    <label class="form-label me-2 mb-0">เดือน:</label>
+                    <select class="form-select" id="historyMonthSelect" style="width: auto;" onchange="loadTransactionHistory()"></select>
                 </div>
-                <div class="table-responsive"><table class="table table-striped" id="historyTable">
-                    <thead><tr><th>วันที่</th><th>หมวดหมู่</th><th>ประเภท</th><th>รายละเอียด</th><th>จำนวนเงิน</th><th>จัดการ</th></tr></thead>
-                    <tbody></tbody>
-                </table></div>
-            </div></div>
-            <div class="card mt-4">
-              <div class="card-header">
-                  <h5 class="mb-0"><i class="fas fa-exchange-alt me-2"></i>ประวัติการโอนเงินระหว่างบัญชี</h5>
-              </div>
-              <div class="card-body">
-                  <div class="table-responsive">
-                      <table class="table table-striped" id="transfersHistoryTable">
-                          <thead>
-                              <tr>
-                                  <th>วันที่</th>
-                                  <th>จากบัญชี</th>
-                                  <th>ไปบัญชี</th>
-                                  <th>จำนวนเงิน</th>
-                                  <th>หมายเหตุ</th>
-                              </tr>
-                          </thead>
-                          <tbody>
-                              </tbody>
-                      </table>
-                  </div>
-              </div>
+            </div>
+            <div class="mt-4">
+                <div id="transactionCardList">
+                    </div>
             </div>
         </div>
 
@@ -232,16 +197,6 @@
                  <h4 class="mb-0 fw-bold"><i class="fas fa-cog me-2 text-primary"></i>การตั้งค่า</h4>
             </div>
             <div class="row justify-content-center">
-                <div class="col-lg-6 mb-4">
-                    <div class="card">
-                        <div class="card-header"><h5 class="mb-0">ความปลอดภัย</h5></div>
-                        <div class="card-body text-center">
-                            <div class="mb-4"><i class="fas fa-key fa-3x text-warning mb-3"></i><p class="text-muted">ตั้งรหัส PIN 4 หลักเพื่อป้องกันการเข้าถึง</p></div>
-                            <button class="btn btn-warning" onclick="setupPIN()"><i class="fas fa-shield-alt me-2"></i>ตั้งค่า / เปลี่ยน PIN</button>
-                            <button class="btn btn-outline-secondary ms-2" onclick="removePIN()"><i class="fas fa-unlock me-2"></i>ยกเลิก PIN</button>
-                        </div>
-                    </div>
-                </div>
                 <div class="col-lg-6">
                     <div class="card">
                         <div class="card-header"><h5 class="mb-0">จัดการข้อมูล</h5></div>
@@ -263,63 +218,63 @@
           <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button><button type="button" class="btn btn-primary" id="saveTransactionsBtn"><i class="fas fa-save me-2"></i>บันทึก</button></div>
       </div></div>
     </div>
-<div class="modal fade" id="accountModal" tabindex="-1">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="accountModalTitle"><i class="fas fa-landmark me-2"></i>เพิ่มบัญชีใหม่</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <form id="accountForm">
-                <input type="hidden" id="accountId" name="accountId">
+    <div class="modal fade" id="accountModal" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="accountModalTitle"><i class="fas fa-landmark me-2"></i>เพิ่มบัญชีใหม่</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <form id="accountForm">
+                    <input type="hidden" id="accountId" name="accountId">
 
-                <div class="mb-3">
-                    <label class="form-label">ชื่อบัญชี</label>
-                    <input type="text" class="form-control" id="accountName" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">ประเภท</label>
-                    <input type="text" class="form-control" id="accountType" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">ยอดเงินเริ่มต้น</label>
-                    <input type="number" class="form-control" id="initialBalance" value="0" required>
-                </div>
-            </form>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-            <button type="submit" form="accountForm" id="saveAccountBtn" class="btn btn-primary"><i class="fas fa-check me-1"></i>ยืนยัน</button>
+                    <div class="mb-3">
+                        <label class="form-label">ชื่อบัญชี</label>
+                        <input type="text" class="form-control" id="accountName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">ประเภท</label>
+                        <input type="text" class="form-control" id="accountType" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">ยอดเงินเริ่มต้น</label>
+                        <input type="number" class="form-control" id="initialBalance" value="0" required>
+                    </div>
+                </form>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="submit" form="accountForm" id="saveAccountBtn" class="btn btn-primary"><i class="fas fa-check me-1"></i>ยืนยัน</button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-    <div class="modal fade" id="transferModal" tabindex="-1">
-      <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
-          <div class="modal-header"><h5 class="modal-title"><i class="fas fa-exchange-alt me-2"></i>โอนเงิน</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-          <div class="modal-body"><form id="transferForm">
-              <div class="mb-3"><label class="form-label">วันที่</label><input type="date" class="form-control" id="transferDate" required></div>
-              <div class="mb-3"><label class="form-label">จากบัญชี</label><select class="form-select" id="transferFrom" required></select></div>
-              <div class="mb-3"><label class="form-label">ไปบัญชี</label><select class="form-select" id="transferTo" required></select></div>
-              <div class="mb-3"><label class="form-label">จำนวนเงิน</label><input type="number" class="form-control" id="transferAmount" min="0.01" step="0.01" required></div>
-              <div class="mb-3"><label class="form-label">หมายเหตุ</label><input type="text" class="form-control" id="transferDescription"></div>
-          </form></div>
-          <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-          <button type="submit" form="transferForm" id="saveTransferBtn" class="btn btn-success"><i class="fas fa-check me-1"></i>ยืนยัน</button></div>
-      </div></div>
-    </div>
-    <div class="modal fade" id="categoryModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title"><i class="fas fa-tags me-2"></i>เพิ่มหมวดหมู่ใหม่</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body"><form id="categoryForm">
-                <div class="mb-3"><label class="form-label">ชื่อหมวดหมู่</label><input type="text" class="form-control" id="categoryName" required></div>
-                <div class="mb-3"><label class="form-label">ประเภท</label><select class="form-select" id="categoryType" required><option value="">เลือกประเภท</option><option value="income">รายรับ</option><option value="expense">รายจ่าย</option></select></div>
-                <div class="mb-3"><label class="form-label">สี</label><input type="color" class="form-control form-control-color" id="categoryColor" value="#42a5f5"></div>
-            </form></div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button><button type="submit" form="categoryForm" class="btn btn-primary"><i class="fas fa-plus me-1"></i>เพิ่ม</button></div>
-        </div></div>
-    </div>
+        <div class="modal fade" id="transferModal" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+              <div class="modal-header"><h5 class="modal-title"><i class="fas fa-exchange-alt me-2"></i>โอนเงิน</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+              <div class="modal-body"><form id="transferForm">
+                  <div class="mb-3"><label class="form-label">วันที่</label><input type="date" class="form-control" id="transferDate" required></div>
+                  <div class="mb-3"><label class="form-label">จากบัญชี</label><select class="form-select" id="transferFrom" required></select></div>
+                  <div class="mb-3"><label class="form-label">ไปบัญชี</label><select class="form-select" id="transferTo" required></select></div>
+                  <div class="mb-3"><label class="form-label">จำนวนเงิน</label><input type="number" class="form-control" id="transferAmount" min="0.01" step="0.01" required></div>
+                  <div class="mb-3"><label class="form-label">หมายเหตุ</label><input type="text" class="form-control" id="transferDescription"></div>
+              </form></div>
+              <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+              <button type="submit" form="transferForm" id="saveTransferBtn" class="btn btn-success"><i class="fas fa-check me-1"></i>ยืนยัน</button></div>
+          </div></div>
+        </div>
+        <div class="modal fade" id="categoryModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title"><i class="fas fa-tags me-2"></i>เพิ่มหมวดหมู่ใหม่</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body"><form id="categoryForm">
+                    <div class="mb-3"><label class="form-label">ชื่อหมวดหมู่</label><input type="text" class="form-control" id="categoryName" required></div>
+                    <div class="mb-3"><label class="form-label">ประเภท</label><select class="form-select" id="categoryType" required><option value="">เลือกประเภท</option><option value="income">รายรับ</option><option value="expense">รายจ่าย</option></select></div>
+                    <div class="mb-3"><label class="form-label">สี</label><input type="color" class="form-control form-control-color" id="categoryColor" value="#42a5f5"></div>
+                </form></div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button><button type="submit" form="categoryForm" class="btn btn-primary"><i class="fas fa-plus me-1"></i>เพิ่ม</button></div>
+            </div></div>
+        </div>
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
