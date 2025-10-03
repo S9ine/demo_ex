@@ -2,23 +2,13 @@
     // ===================================================================================
     // GLOBAL VARIABLES & APP INITIALIZATION
     // ===================================================================================
-    let appData = {
-        transactions: [],
-        categories: [],
-        budgets: {},
-        accounts: [],
-        transfers: [],
-        taxData: {}
-    };
-
+    let appData = { transactions: [], categories: [], budgets: {}, accounts: [], transfers: [], taxData: {} };
     let charts = {};
     let historyDataTable;
     let isGoogleSheetsMode = false;
     let transactionModalInstance, accountModalInstance, transferModalInstance, categoryModalInstance;
 
-    $(document).ready(function() {
-        initializeApp();
-    });
+    $(document).ready(function() { initializeApp(); });
 
     function initializeApp() {
         showLoading();
@@ -45,40 +35,37 @@
     function startDataLoading() {
         $('#pinOverlay').hide();
         showLoading();
-        updateLoadingStatus('กำลังเชื่อมต่อกับ Google Sheets...');
-
-        google.script.run.withSuccessHandler(function() {
+        updateLoadingStatus('กำลังเชื่อมต่อ...');
+        google.script.run.withSuccessHandler(() => {
           isGoogleSheetsMode = true;
           updateLoadingStatus('กำลังเตรียมข้อมูล...');
           initializeSheets();
-        }).withFailureHandler(function(error) {
-          console.error('Error connecting to Google Sheets:', error);
+        }).withFailureHandler(err => {
+          console.error('Connection Error:', err);
           fallbackToLocalMode();
         }).testConnection();
     }
 
     function initializeSheets() {
-      google.script.run.withSuccessHandler(function() {
+      google.script.run.withSuccessHandler(() => {
         updateLoadingStatus('กำลังโหลดข้อมูล...');
         loadDataFromSource();
-      }).withFailureHandler(function(error) {
-        console.error('Error initializing sheets:', error);
+      }).withFailureHandler(err => {
+        console.error('Sheet Init Error:', err);
         fallbackToLocalMode();
       }).initializeSheets();
     }
     
     function fallbackToLocalMode() {
-        updateLoadingStatus('เปลี่ยนเป็นโหมดออฟไลน์...');
+        updateLoadingStatus('เปลี่ยนเป็นโหมดออฟไลน์');
         isGoogleSheetsMode = false;
-        setTimeout(function() {
-            loadDataFromSource();
-        }, 1000);
+        setTimeout(() => loadDataFromSource(), 1000);
     }
     
     function loadDataFromSource() {
         if (isGoogleSheetsMode) {
             google.script.run
-                .withSuccessHandler(function(data) {
+                .withSuccessHandler(data => {
                     if (data && typeof data === 'object') {
                         appData.transactions = Array.isArray(data.transactions) ? data.transactions.map(t => ({...t, date: new Date(t.date).toISOString().split('T')[0]})) : [];
                         appData.categories = Array.isArray(data.categories) ? data.categories : [];
@@ -90,24 +77,21 @@
                     if (appData.categories.length === 0) createDefaultCategories();
                     initializeUI();
                 })
-                .withFailureHandler(function(error) {
-                    console.error('Error loading data:', error);
+                .withFailureHandler(err => {
+                    console.error('Data Loading Error:', err);
                     fallbackToLocalMode();
                 })
                 .getAppData();
         } else {
             loadData();
-            if (!appData.transactions || appData.transactions.length === 0) {
-                createMockData();
-                saveData();
-            }
+            if (!appData.transactions || appData.transactions.length === 0) createMockData();
             initializeUI();
         }
     }
 
     function initializeUI() {
         updateLoadingStatus('กำลังเตรียมหน้าจอ...');
-        setTimeout(function() {
+        setTimeout(() => {
             transactionModalInstance = new bootstrap.Modal(document.getElementById('transactionModal'));
             accountModalInstance = new bootstrap.Modal(document.getElementById('accountModal'));
             transferModalInstance = new bootstrap.Modal(document.getElementById('transferModal'));
@@ -134,12 +118,8 @@
     // ===================================================================================
     function loadData() {
         const savedData = localStorage.getItem('financeApp');
-        if (savedData) {
-            appData = JSON.parse(savedData);
-        } else {
-            createMockData();
-            saveData();
-        }
+        if (savedData) appData = JSON.parse(savedData);
+        else createMockData();
     }
     
     function createDefaultCategories() {
@@ -175,29 +155,21 @@
     // ===================================================================================
     // EVENT HANDLERS
     // ===================================================================================
-function setupEventHandlers() {
+    function setupEventHandlers() {
+        $('#transactionForm, #categoryForm, #budgetForm, #accountForm, #transferForm, #taxForm').on('submit', e => e.preventDefault());
         $('#transactionForm').on('submit', saveTransactions);
         $('#categoryForm').on('submit', addCategory);
         $('#budgetForm').on('submit', saveBudget);
         $('#accountForm').on('submit', saveAccount);
         $('#transferForm').on('submit', saveTransfer);
         $('#taxForm').on('submit', saveTaxData);
-
         $('#saveTransactionsBtn').on('click', () => $('#transactionForm').submit());
-        
         $('#filterCategory, #filterStartDate, #filterEndDate').on('change', loadTransactionHistory);
-        $('#resetFilter').on('click', function () {
-            $('#filterCategory, #filterStartDate, #filterEndDate').val('');
-            loadTransactionHistory();
-        });
-        
-        // **แก้ไขสมบูรณ์แล้ว: ลบเครื่องหมาย $ ที่เกินออก**
-        $('#transactionModal').on('hidden.bs.modal', function() { 
-            $('#transactionCards').html(''); 
-            addTransactionCard(); 
-        });
-
+        $('#resetFilter').on('click', () => { $('#filterCategory, #filterStartDate, #filterEndDate').val(''); loadTransactionHistory(); });
+        $('#transactionModal').on('hidden.bs.modal', () => { $('#transactionCards').html(''); addTransactionCard(); });
         $('#taxTotalIncome, #taxDeductibleExpenses').on('input', calculateTax);
+        $('#accountModal').on('show.bs.modal', () => $('#accountModalTitle').html('<i class="fas fa-landmark me-2"></i>เพิ่มบัญชีใหม่'));
+        $('#accountModal').on('hidden.bs.modal', () => { $('#accountForm')[0].reset(); $('#accountId').val(''); });
     }
 
     // ===================================================================================
@@ -206,34 +178,40 @@ function setupEventHandlers() {
     function setupThemeSwitcher() {
         const switcher = $('#theme-switcher');
         const body = $('body');
+        const updateThemeIcon = theme => switcher.find('i').toggleClass('fa-moon', theme === 'light').toggleClass('fa-sun', theme === 'dark');
         const currentTheme = localStorage.getItem('appTheme') || 'light';
-
         body.attr('data-theme', currentTheme);
         updateThemeIcon(currentTheme);
-
-        switcher.on('click', function() {
+        switcher.on('click', () => {
             const newTheme = body.attr('data-theme') === 'light' ? 'dark' : 'light';
             body.attr('data-theme', newTheme);
             localStorage.setItem('appTheme', newTheme);
             updateThemeIcon(newTheme);
             updateDashboard();
         });
+    }
 
-    function setupPinInputLogic() {
+function setupPinInputLogic() {
         const inputs = $('.pin-input');
 
         inputs.on('input', function() {
+            // ตรวจสอบว่ามีการกรอกข้อมูลแล้วเท่านั้น
             if (this.value.length >= 1) {
                 const nextInput = $(this).next('.pin-input');
+                
                 if (nextInput.length > 0) {
+                    // ถ้ามีช่องถัดไป ให้ย้าย Cursor ไป
                     nextInput.focus();
                 } else {
+                    // ถ้าเป็นช่องสุดท้ายแล้ว ให้ทำการตรวจสอบ PIN
+                    // (Logic นี้จะทำงานเมื่อกรอกตัวเลขในช่องที่ 4 เท่านั้น)
                     verifyPIN();
                 }
             }
         });
 
         inputs.on('keydown', function(e) {
+            // Logic สำหรับการกด Backspace เพื่อย้อนกลับ
             if (e.key === 'Backspace' && this.value.length === 0) {
                 $(this).prev('.pin-input').focus();
             }
@@ -247,79 +225,32 @@ function setupEventHandlers() {
             });
         });
     }
+
     function verifyPIN() {
         const enteredPIN = Array.from($('.pin-input')).map(input => input.value).join('');
-        const storedPIN = localStorage.getItem('appPIN');
-
-        if (btoa(enteredPIN) === storedPIN) {
-            startDataLoading();
-        } else {
-            $('#pinErrorMessage').show();
-            $('.pin-input').val('').first().focus();
-            setTimeout(() => $('#pinErrorMessage').hide(), 2000);
-        }
+        if (btoa(enteredPIN) === localStorage.getItem('appPIN')) startDataLoading();
+        else { $('#pinErrorMessage').show(); $('.pin-input').val('').first().focus(); setTimeout(() => $('#pinErrorMessage').hide(), 2000); }
     }
+
     async function setupPIN() {
-        const { value: newPIN } = await Swal.fire({
-            title: 'ตั้งค่า PIN ใหม่ (4 หลัก)',
-            input: 'password',
-            inputLabel: 'กรอก PIN 4 หลัก',
-            inputPlaceholder: '****',
-            inputAttributes: {
-                maxlength: 4,
-                autocapitalize: 'off',
-                autocorrect: 'off'
-            },
-            inputValidator: (value) => {
-                if (!value || !/^\d{4}$/.test(value)) {
-                    return 'กรุณากรอกตัวเลข 4 หลัก!';
-                }
-            }
-        });
-
-        if (newPIN) {
-            const encodedPIN = btoa(newPIN);
-            localStorage.setItem('appPIN', encodedPIN);
-            Swal.fire({
-                icon: 'success',
-                title: 'ตั้งค่า PIN สำเร็จ!',
-                text: 'ครั้งต่อไปที่คุณเข้าแอป จะต้องใช้ PIN นี้'
-            });
-        }
+        const { value: newPIN } = await Swal.fire({ title: 'ตั้งค่า PIN (4 หลัก)', input: 'password', inputLabel: 'กรอกตัวเลข 4 หลัก', inputPlaceholder: '****', inputAttributes: { maxlength: 4, pattern: "\\d*", inputmode: "numeric" }, inputValidator: val => (!val || !/^\d{4}$/.test(val)) && 'กรุณากรอกตัวเลข 4 หลัก' });
+        if (newPIN) { localStorage.setItem('appPIN', btoa(newPIN)); Swal.fire('สำเร็จ!', 'ตั้งค่า PIN เรียบร้อยแล้ว', 'success'); }
     }
+
     function removePIN() {
-        const storedPIN = localStorage.getItem('appPIN');
-        if (!storedPIN) {
-            Swal.fire('ไม่มีข้อมูล', 'คุณยังไม่ได้ตั้งค่า PIN', 'info');
-            return;
-        }
-
-        Swal.fire({
-            title: 'ยืนยันการยกเลิก PIN',
-            text: 'คุณต้องการยกเลิกการใช้ PIN ใช่หรือไม่?',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'ยืนยัน',
-            cancelButtonText: 'ยกเลิก'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                localStorage.removeItem('appPIN');
-                Swal.fire('สำเร็จ!', 'ยกเลิกการใช้ PIN เรียบร้อยแล้ว', 'success');
-            }
-        });
+        if (!localStorage.getItem('appPIN')) return Swal.fire('ไม่มีข้อมูล', 'คุณยังไม่ได้ตั้งค่า PIN', 'info');
+        Swal.fire({ title: 'ยืนยันการยกเลิก PIN', text: 'คุณต้องการยกเลิกการใช้ PIN ใช่หรือไม่?', icon: 'warning', showCancelButton: true, confirmButtonText: 'ยืนยัน', cancelButtonText: 'ยกเลิก' })
+            .then(result => { if (result.isConfirmed) { localStorage.removeItem('appPIN'); Swal.fire('สำเร็จ!', 'ยกเลิกการใช้ PIN เรียบร้อยแล้ว', 'success'); } });
     }
-    
+
     function showSection(sectionName) {
         $('.section').removeClass('active');
         $('#' + sectionName).addClass('active');
         $('.nav-link').removeClass('active');
         $(`a[onclick="showSection('${sectionName}')"]`).addClass('active');
         
-        if (sectionName === 'dashboard') updateDashboard();
-        else if (sectionName === 'transactions') loadTransactionHistory();
-        else if (sectionName === 'categories') loadCategories();
-        else if (sectionName === 'budget') loadBudgetForm();
-        else if (sectionName === 'tax') loadTaxData();
+        const sectionLoaders = { dashboard: updateDashboard, transactions: loadTransactionHistory, categories: loadCategories, budget: loadBudgetForm, tax: loadTaxData };
+        if (sectionLoaders[sectionName]) sectionLoaders[sectionName]();
     }
 
     // ===================================================================================
@@ -344,19 +275,22 @@ function setupEventHandlers() {
             const transferOut = appData.transfers.filter(t => t.from == account.id).reduce((sum, t) => sum + t.amount, 0);
             const currentBalance = account.initialBalance + income - expense + transferIn - transferOut;
 
-            const card = `
-                <div class="col-md-4 mb-3">
-                    <div class="account-card-small">
-                        <div class="d-flex justify-content-between align-items-center">
-                           <div>
-                             <h6 class="mb-0">${account.name}</h6>
-                             <small class="text-muted">${account.type}</small>
-                           </div>
-                           <button class="btn btn-sm btn-outline-danger" onclick="deleteAccount(${account.id})"><i class="fas fa-trash"></i></button>
-                        </div>
-                        <p class="balance mt-2 mb-0">฿${currentBalance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-                    </div>
-                </div>`;
+const card = `
+    <div class="col-md-4 mb-3">
+        <div class="account-card-small">
+            <div class="d-flex justify-content-between align-items-center">
+               <div>
+                 <h6 class="mb-0">${account.name}</h6>
+                 <small class="text-muted">${account.type}</small>
+               </div>
+               <div>
+                   <button class="btn btn-sm btn-outline-info me-1" onclick="openEditAccountModal(${account.id})"><i class="fas fa-pencil-alt"></i></button>
+                   <button class="btn btn-sm btn-outline-danger" onclick="deleteAccount(${account.id})"><i class="fas fa-trash"></i></button>
+               </div>
+            </div>
+            <p class="balance mt-2 mb-0">฿${currentBalance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+        </div>
+    </div>`;
             dashboardAccountList.append(card);
 
             transferFrom.append(`<option value="${account.id}">${account.name}</option>`);
@@ -367,77 +301,128 @@ function setupEventHandlers() {
         $('select[name="accountId[]"]').html('<option value="">เลือกบัญชี</option>' + accountOptions);
     }
 
+    function openEditAccountModal(accountId) {
+        const account = appData.accounts.find(acc => acc.id === accountId);
+        if (!account) return;
+
+        // เปลี่ยนหัวข้อ Modal
+        $('#accountModalTitle').html('<i class="fas fa-pencil-alt me-2"></i>แก้ไขบัญชี');
+        
+        // เติมข้อมูลเดิมลงในฟอร์ม
+        $('#accountId').val(account.id);
+        $('#accountName').val(account.name);
+        $('#accountType').val(account.type);
+        $('#initialBalance').val(account.initialBalance);
+
+        // แสดง Modal
+        accountModalInstance.show();
+    }
+
     function saveAccount(e) {
         e.preventDefault();
         
-        const submitButton = $('#accountForm button[type="submit"]');
+        const submitButton = $('#saveAccountBtn');
         const originalButtonHtml = submitButton.html(); 
         submitButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>กำลังบันทึก...');
 
-        const newAccount = {
-            id: Date.now(),
+        const accountId = $('#accountId').val(); // ดึง ID จาก Hidden Input
+
+        const accountData = {
+            id: accountId ? parseInt(accountId) : Date.now(),
             name: $('#accountName').val(),
             type: $('#accountType').val(),
             initialBalance: parseFloat($('#initialBalance').val()),
-            icon: 'fa-wallet'
         };
 
-        if (!newAccount.name || !newAccount.type) {
+        if (!accountData.name || !accountData.type) {
              Swal.fire('ข้อมูลไม่ครบถ้วน', 'กรุณากรอกชื่อและประเภทบัญชี', 'warning');
              submitButton.prop('disabled', false).html(originalButtonHtml);
              return;
         }
         
-        appData.accounts.push(newAccount);
-        
-        const resetButton = () => submitButton.prop('disabled', false).html(originalButtonHtml);
-        
+        const isEditing = !!accountId; // ตรวจสอบว่าเป็นการแก้ไขหรือไม่
+        const successMessage = isEditing ? 'แก้ไขบัญชีเรียบร้อยแล้ว' : 'เพิ่มบัญชีเรียบร้อยแล้ว';
+
         const handleSuccess = () => {
+            if (isEditing) {
+                // อัปเดตข้อมูลใน appData
+                const index = appData.accounts.findIndex(acc => acc.id === accountData.id);
+                if (index !== -1) appData.accounts[index] = { ...appData.accounts[index], ...accountData };
+            } else {
+                // เพิ่มข้อมูลใหม่ (ถ้ายังไม่ได้เพิ่ม)
+                if (!appData.accounts.some(acc => acc.id === accountData.id)) {
+                    appData.accounts.push({ ...accountData, icon: 'fa-wallet' });
+                }
+            }
             $('#accountForm')[0].reset();
+            $('#accountId').val(''); // ล้าง ID ทุกครั้ง
             loadAccounts();
-            resetButton();
+            submitButton.prop('disabled', false).html(originalButtonHtml);
         };
 
         if (isGoogleSheetsMode) {
-            google.script.run
+            const apiCall = isEditing ? google.script.run.updateAccount(accountData) : google.script.run.saveAccount(accountData);
+            apiCall
                 .withSuccessHandler(response => {
-                    Swal.fire('สำเร็จ!', 'เพิ่มบัญชีเรียบร้อยแล้ว', 'success').then(() => {
-                        accountModalInstance.hide();
-                    });
+                    Swal.fire('สำเร็จ!', successMessage, 'success').then(() => accountModalInstance.hide());
                     handleSuccess();
                 })
                 .withFailureHandler(err => {
-                    Swal.fire('ผิดพลาด', 'ไม่สามารถบันทึกบัญชีได้', 'error');
-                    resetButton();
-                })
-                .saveAccount(newAccount);
+                    Swal.fire('ผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้', 'error');
+                    submitButton.prop('disabled', false).html(originalButtonHtml);
+                });
         } else {
             saveData();
-            Swal.fire('สำเร็จ!', 'เพิ่มบัญชีเรียบร้อยแล้ว (โหมดออฟไลน์)', 'success').then(() => {
-                accountModalInstance.hide();
-            });
+            Swal.fire('สำเร็จ!', successMessage + ' (โหมดออฟไลน์)', 'success').then(() => accountModalInstance.hide());
             handleSuccess();
         }
     }
     
-    function deleteAccount(accountId) {
-        const hasTransactions = appData.transactions.some(t => t.accountId == accountId);
-        const hasTransfers = appData.transfers.some(t => t.from == accountId || t.to == accountId);
+function deleteAccount(accountId) {
+        const account = appData.accounts.find(acc => acc.id === accountId);
+        if (!account) return;
 
-        if (hasTransactions || hasTransfers) {
-            Swal.fire('ไม่สามารถลบได้', 'บัญชีนี้มีรายการเคลื่อนไหวอยู่ จึงไม่สามารถลบได้', 'error');
+        const income = appData.transactions.filter(t => t.accountId == account.id && t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+        const expense = appData.transactions.filter(t => t.accountId == account.id && t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+        const transferIn = appData.transfers.filter(t => t.to == account.id).reduce((sum, t) => sum + t.amount, 0);
+        const transferOut = appData.transfers.filter(t => t.from == account.id).reduce((sum, t) => sum + t.amount, 0);
+        const currentBalance = account.initialBalance + income - expense + transferIn - transferOut;
+
+        // --- ส่วนที่แก้ไข ---
+        // เปลี่ยนจากการเปรียบเทียบ !== 0 มาเป็นการตรวจสอบค่าที่น้อยมากๆ
+        // เพื่อป้องกันปัญหา Floating Point Precision
+        if (Math.abs(currentBalance) > 0.001) { 
+            Swal.fire({
+                icon: 'error',
+                title: 'ไม่สามารถลบได้',
+                text: `บัญชียังมียอดเงินคงเหลืออยู่ ${currentBalance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} บาท กรุณาโอนย้ายเงินออกก่อน`
+            });
             return;
         }
+        // ------------------
 
-        Swal.fire({
+        const accountIdStr = String(accountId);
+        const hasHistory = appData.transactions.some(t => String(t.accountId) === accountIdStr) || 
+                           appData.transfers.some(t => String(t.from) === accountIdStr || String(t.to) === accountIdStr);
+
+        const confirmationConfig = {
             title: 'ยืนยันการลบ',
-            text: 'คุณต้องการลบบัญชีนี้ใช่หรือไม่?',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'ลบ',
-            cancelButtonText: 'ยกเลิก'
-        }).then((result) => {
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#d33',
+        };
+
+        if (hasHistory) {
+            confirmationConfig.text = "ยอดเงินในบัญชีเป็น 0 แล้ว แต่บัญชียังมีประวัติการทำรายการอยู่ หากลบ บัญชีจะหายไปจากระบบ แต่ประวัติเก่าๆ จะยังคงอยู่ (ไม่สามารถแก้ไขได้อีก) ยืนยันที่จะลบหรือไม่?";
+        } else {
+            confirmationConfig.text = "คุณต้องการลบบัญชีนี้ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้";
+        }
+
+        Swal.fire(confirmationConfig).then((result) => {
             if (!result.isConfirmed) return;
+            
             Swal.fire({ title: 'กำลังลบ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
             appData.accounts = appData.accounts.filter(acc => acc.id !== accountId);
@@ -455,7 +440,7 @@ function setupEventHandlers() {
             } else {
                 saveData();
                 loadAccounts();
-                Swal.fire('สำเร็จ!', 'ลบบัญชีเรียบร้อยแล้ว', 'success');
+                Swal.fire('สำเร็จ!', 'ลบบัญชีเรียบร้อยแล้ว (โหมดออฟไลน์)', 'success');
             }
         });
     }
@@ -481,9 +466,14 @@ function setupEventHandlers() {
       });
     }
     
-    function saveTransfer(e) {
+function saveTransfer(e) {
         e.preventDefault();
         
+        // --- ส่วนที่เพิ่มเข้ามา ---
+        const submitButton = $('#saveTransferBtn');
+        const originalButtonHtml = submitButton.html();
+        // ------------------
+
         const fromId = $('#transferFrom').val();
         const toId = $('#transferTo').val();
 
@@ -491,6 +481,11 @@ function setupEventHandlers() {
             Swal.fire('ผิดพลาด', 'กรุณาเลือกบัญชีต้นทางและปลายทางที่แตกต่างกัน', 'warning');
             return;
         }
+
+        // --- เพิ่มเข้ามา: เปลี่ยนปุ่มเป็นสถานะ "กำลังโหลด" ---
+        submitButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>กำลังโอน...');
+        const resetButton = () => submitButton.prop('disabled', false).html(originalButtonHtml);
+        // ------------------------------------------
 
         const newTransfer = {
             id: Date.now(),
@@ -507,6 +502,7 @@ function setupEventHandlers() {
             $('#transferForm')[0].reset();
             loadAccounts();
             loadTransfers();
+            resetButton(); // <-- คืนค่าปุ่ม
         };
 
         if (isGoogleSheetsMode) {
@@ -517,7 +513,10 @@ function setupEventHandlers() {
                     });
                     handleSuccess();
                 })
-                .withFailureHandler(err => Swal.fire('ผิดพลาด', 'ไม่สามารถบันทึกได้', 'error'))
+                .withFailureHandler(err => {
+                    Swal.fire('ผิดพลาด', 'ไม่สามารถบันทึกได้', 'error');
+                    resetButton(); // <-- คืนค่าปุ่มเมื่อ Error
+                })
                 .saveTransfer(newTransfer);
         } else {
             saveData();
@@ -801,6 +800,11 @@ function setupEventHandlers() {
                     accountId: accountIds[i]
                 });
             }
+
+            const submitButton = $('#saveTransactionsBtn');
+            const originalButtonHtml = submitButton.html();
+            submitButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>กำลังบันทึก...');
+            const resetButton = () => submitButton.prop('disabled', false).html(originalButtonHtml);
             
             appData.transactions.push(...newTransactions);
             
@@ -1559,6 +1563,36 @@ function updateIncomeChart() {
             });
         }
 
+    function populateBudgetMonthYear() {
+        const monthSelect = $('#budgetMonthSelect');
+        const yearSelect = $('#budgetYearSelect');
+
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1; // 1–12
+        const currentYear = now.getFullYear();
+
+        // Populate months if empty
+        if (monthSelect.children().length === 0) {
+            const monthNames = [
+                'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+                'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+            ];
+            monthNames.forEach((monthName, index) => {
+                const monthValue = (index + 1).toString().padStart(2, '0'); // 01–12
+                const selected = (index + 1 === currentMonth) ? 'selected' : '';
+                monthSelect.append(`<option value="${monthValue}" ${selected}>${monthName}</option>`);
+            });
+        }
+
+        // Populate years if empty
+        if (yearSelect.children().length === 0) {
+            for (let year = currentYear - 2; year <= currentYear + 5; year++) {
+                const displayYear = year + 543; // Convert to Buddhist year
+                const selected = (year === currentYear) ? 'selected' : '';
+                yearSelect.append(`<option value="${year}" ${selected}>${displayYear}</option>`);
+            }
+        }
+    }
 
         function loadBudgetForm() {
             populateBudgetMonthYear();
@@ -1608,6 +1642,11 @@ const row = `
         }
         function saveBudget(e) {
           e.preventDefault();
+
+        const submitButton = $('#budgetForm button[type="submit"]');
+        const originalButtonHtml = submitButton.html();
+        submitButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>กำลังบันทึก...');
+        const resetButton = () => submitButton.prop('disabled', false).html(originalButtonHtml);
 
           const selectedMonth = $('#budgetMonthSelect').val();
           const selectedYear = $('#budgetYearSelect').val();
