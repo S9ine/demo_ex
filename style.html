@@ -297,5 +297,117 @@
         height: 350px; /* ลดความสูงลงเล็กน้อยสำหรับ Mobile */
         margin: 15px 0;
     }
+
+    /* ======================================= */
+/* PIN Lock Screen Styles (ใหม่)        */
+/* ======================================= */
+.pin-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--background-color);
+    display: none; /* ซ่อนไว้เป็นค่าเริ่มต้น */
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    flex-direction: column;
+}
+
+.pin-container {
+    background-color: var(--surface-color);
+    padding: 2.5rem;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-md);
+    text-align: center;
+    width: 90%;
+    max-width: 380px;
+}
+
+.pin-input-group {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 1.5rem 0;
+}
+
+.pin-input {
+    width: 50px;
+    height: 60px;
+    font-size: 2rem;
+    text-align: center;
+    border: 2px solid var(--border-color);
+    background-color: var(--background-color);
+    color: var(--text-color);
+    border-radius: 8px;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+.pin-input:focus {
+    border-color: var(--primary-color);
+}
+
+/* ======================================= */
+/* Floating Action Button (FAB) Styles     */
+/* ======================================= */
+.fab {
+    position: fixed;
+    width: 60px;
+    height: 60px;
+    bottom: 30px;
+    right: 30px;
+    background-color: var(--primary-color);
+    color: #FFF;
+    border-radius: 50px;
+    text-align: center;
+    font-size: 24px;
+    box-shadow: var(--shadow-md);
+    border: none;
+    z-index: 1050;
+    transition: all 0.3s ease;
+}
+.fab:hover {
+    background-color: var(--primary-darker);
+    transform: scale(1.1);
+}
+
+/* ======================================= */
+/* Dashboard Account List Styles           */
+/* ======================================= */
+.account-card-small {
+    background-color: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.account-card-small:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-sm);
+}
+.account-card-small .balance {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+[data-theme="dark"] .account-card-small .balance {
+    color: var(--primary-color);
+}
+
+/* Modal Styling */
+.modal-content {
+    background-color: var(--surface-color);
+    border-radius: var(--border-radius);
+    border: none;
+}
+.modal-header {
+    border-bottom: 1px solid var(--border-color);
+}
+.modal-footer {
+    border-top: 1px solid var(--border-color);
+}
+
     
 </style>
