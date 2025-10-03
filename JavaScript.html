@@ -2,7 +2,7 @@
     // ===================================================================================
     // GLOBAL VARIABLES & APP INITIALIZATION
     // ===================================================================================
-    let appData = { transactions: [], categories: [], budgets: {}, accounts: [], transfers: [], taxData: {} };
+    let appData = { transactions: [], categories: [], budgets: {}, accounts: [], taxData: {} };
     let charts = {};
     let historyDataTable;
     let isGoogleSheetsMode = false;
@@ -14,26 +14,17 @@
         showLoading();
         setupEventHandlers();
         setupThemeSwitcher();
-        setupPinInputLogic(); 
-        checkPIN();
+        // ** REFACTOR: ไม่มีการเรียกใช้ PIN **
+        startDataLoading(); // เริ่มโหลดข้อมูลทันที
     }
 
     // ===================================================================================
     // STARTUP, DATA LOADING & UI INITIALIZATION
     // ===================================================================================
-    function checkPIN() {
-        const storedPIN = localStorage.getItem('appPIN');
-        if (storedPIN) {
-            $('#pinOverlay').css('display', 'flex');
-            hideLoading();
-            $('.pin-input').first().focus();
-        } else {
-            startDataLoading();
-        }
-    }
+    // ** REFACTOR: ลบฟังก์ชัน checkPIN ออก **
 
     function startDataLoading() {
-        $('#pinOverlay').hide();
+        // $('#pinOverlay').hide(); // ไม่จำเป็นต้องซ่อนอีกต่อไป
         showLoading();
         updateLoadingStatus('กำลังเชื่อมต่อ...');
         google.script.run.withSuccessHandler(() => {
@@ -71,7 +62,6 @@
                         appData.categories = Array.isArray(data.categories) ? data.categories : [];
                         appData.budgets = (data.budgets && typeof data.budgets === 'object') ? data.budgets : {};
                         appData.accounts = Array.isArray(data.accounts) ? data.accounts : [];
-                        appData.transfers = Array.isArray(data.transfers) ? data.transfers : [];
                         appData.taxData = (data.taxData && typeof data.taxData === 'object') ? data.taxData : {};
                     }
                     if (appData.categories.length === 0) createDefaultCategories();
@@ -99,12 +89,12 @@
 
             updateCurrentMonth();
             populateDashboardMonths();
+            populateHistoryMonths(); // ** REFACTOR: เพิ่มการสร้างตัวเลือกเดือนสำหรับหน้าประวัติ **
             addTransactionCard(); 
             updateDashboard(); 
             loadCategories();
             loadBudgetForm();
             loadTransactionHistory();
-            loadTransfers();
             populateTaxYear();
             loadTaxData();
             
@@ -143,7 +133,6 @@
               { id: 1, name: "เงินสด", type: "Cash", initialBalance: 1000, icon: "fa-wallet"},
               { id: 2, name: "ธนาคาร", type: "Savings", initialBalance: 5000, icon: "fa-landmark"}
             ],
-            transfers: [],
             taxData: {}
         };
     }
@@ -191,67 +180,21 @@
         });
     }
 
-function setupPinInputLogic() {
-        const inputs = $('.pin-input');
+    // ** REFACTOR: ลบฟังก์ชันเกี่ยวกับ PIN ทั้งหมด **
+    // - setupPinInputLogic()
+    // - verifyPIN()
+    // - setupPIN()
+    // - removePIN()
 
-        inputs.on('input', function() {
-            // ตรวจสอบว่ามีการกรอกข้อมูลแล้วเท่านั้น
-            if (this.value.length >= 1) {
-                const nextInput = $(this).next('.pin-input');
-                
-                if (nextInput.length > 0) {
-                    // ถ้ามีช่องถัดไป ให้ย้าย Cursor ไป
-                    nextInput.focus();
-                } else {
-                    // ถ้าเป็นช่องสุดท้ายแล้ว ให้ทำการตรวจสอบ PIN
-                    // (Logic นี้จะทำงานเมื่อกรอกตัวเลขในช่องที่ 4 เท่านั้น)
-                    verifyPIN();
-                }
-            }
-        });
-
-        inputs.on('keydown', function(e) {
-            // Logic สำหรับการกด Backspace เพื่อย้อนกลับ
-            if (e.key === 'Backspace' && this.value.length === 0) {
-                $(this).prev('.pin-input').focus();
-            }
-        });
-
-        $('#forgotPinButton').on('click', function() {
-            Swal.fire({
-                icon: 'info',
-                title: 'ลืม PIN?',
-                text: 'หากต้องการรีเซ็ต PIN คุณจะต้องล้างข้อมูลทั้งหมดของแอปพลิเคชันในเบราว์เซอร์ (Clear site data) แล้วเริ่มต้นใหม่'
-            });
-        });
+    function showSection(sectionName) {
+        $('.section').removeClass('active');
+        $('#' + sectionName).addClass('active');
+        $('.nav-link').removeClass('active'); 
+        $(`a[onclick="showSection('${sectionName}')"]`).addClass('active'); 
+        
+        const sectionLoaders = { dashboard: updateDashboard, transactions: loadTransactionHistory, categories: loadCategories, budget: loadBudgetForm, tax: loadTaxData };
+        if (sectionLoaders[sectionName]) sectionLoaders[sectionName]();
     }
-
-    function verifyPIN() {
-        const enteredPIN = Array.from($('.pin-input')).map(input => input.value).join('');
-        if (btoa(enteredPIN) === localStorage.getItem('appPIN')) startDataLoading();
-        else { $('#pinErrorMessage').show(); $('.pin-input').val('').first().focus(); setTimeout(() => $('#pinErrorMessage').hide(), 2000); }
-    }
-
-    async function setupPIN() {
-        const { value: newPIN } = await Swal.fire({ title: 'ตั้งค่า PIN (4 หลัก)', input: 'password', inputLabel: 'กรอกตัวเลข 4 หลัก', inputPlaceholder: '****', inputAttributes: { maxlength: 4, pattern: "\\d*", inputmode: "numeric" }, inputValidator: val => (!val || !/^\d{4}$/.test(val)) && 'กรุณากรอกตัวเลข 4 หลัก' });
-        if (newPIN) { localStorage.setItem('appPIN', btoa(newPIN)); Swal.fire('สำเร็จ!', 'ตั้งค่า PIN เรียบร้อยแล้ว', 'success'); }
-    }
-
-    function removePIN() {
-        if (!localStorage.getItem('appPIN')) return Swal.fire('ไม่มีข้อมูล', 'คุณยังไม่ได้ตั้งค่า PIN', 'info');
-        Swal.fire({ title: 'ยืนยันการยกเลิก PIN', text: 'คุณต้องการยกเลิกการใช้ PIN ใช่หรือไม่?', icon: 'warning', showCancelButton: true, confirmButtonText: 'ยืนยัน', cancelButtonText: 'ยกเลิก' })
-            .then(result => { if (result.isConfirmed) { localStorage.removeItem('appPIN'); Swal.fire('สำเร็จ!', 'ยกเลิกการใช้ PIN เรียบร้อยแล้ว', 'success'); } });
-    }
-
-function showSection(sectionName) {
-    $('.section').removeClass('active');
-    $('#' + sectionName).addClass('active');
-    $('.nav-link').removeClass('active'); // บรรทัดที่จะแก้ไข
-    $(`a[onclick="showSection('${sectionName}')"]`).addClass('active'); // บรรทัดที่จะแก้ไข
-    
-    const sectionLoaders = { dashboard: updateDashboard, transactions: loadTransactionHistory, categories: loadCategories, budget: loadBudgetForm, tax: loadTaxData };
-    if (sectionLoaders[sectionName]) sectionLoaders[sectionName]();
-}
 
     // ===================================================================================
     // ACCOUNTS MANAGEMENT
@@ -269,28 +212,38 @@ function showSection(sectionName) {
         }
 
         appData.accounts.forEach(account => {
-            const income = appData.transactions.filter(t => t.accountId == account.id && t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-            const expense = appData.transactions.filter(t => t.accountId == account.id && t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-            const transferIn = appData.transfers.filter(t => t.to == account.id).reduce((sum, t) => sum + t.amount, 0);
-            const transferOut = appData.transfers.filter(t => t.from == account.id).reduce((sum, t) => sum + t.amount, 0);
-            const currentBalance = account.initialBalance + income - expense + transferIn - transferOut;
+            const currentBalance = appData.transactions.reduce((balance, t) => {
+                if (t.type === 'income' && String(t.accountId) === String(account.id)) {
+                    return balance + t.amount;
+                }
+                if (t.type === 'expense' && String(t.accountId) === String(account.id)) {
+                    return balance - t.amount;
+                }
+                if (t.type === 'transfer' && String(t.to) === String(account.id)) {
+                    return balance + t.amount;
+                }
+                if (t.type === 'transfer' && String(t.from) === String(account.id)) {
+                    return balance - t.amount;
+                }
+                return balance;
+            }, account.initialBalance);
 
-const card = `
-    <div class="col-md-4 mb-3">
-        <div class="account-card-small">
-            <div class="d-flex justify-content-between align-items-center">
-               <div>
-                 <h6 class="mb-0">${account.name}</h6>
-                 <small class="text-muted">${account.type}</small>
-               </div>
-               <div>
-                   <button class="btn btn-sm btn-outline-info me-1" onclick="openEditAccountModal(${account.id})"><i class="fas fa-pencil-alt"></i></button>
-                   <button class="btn btn-sm btn-outline-danger" onclick="deleteAccount(${account.id})"><i class="fas fa-trash"></i></button>
-               </div>
+    const card = `
+        <div class="col-md-4 mb-3">
+            <div class="account-card-small">
+                <div class="d-flex justify-content-between align-items-center">
+                   <div>
+                     <h6 class="mb-0">${account.name}</h6>
+                     <small class="text-muted">${account.type}</small>
+                   </div>
+                   <div>
+                       <button class="btn btn-sm btn-outline-info me-1" onclick="openEditAccountModal(${account.id})"><i class="fas fa-pencil-alt"></i></button>
+                       <button class="btn btn-sm btn-outline-danger" onclick="deleteAccount(${account.id})"><i class="fas fa-trash"></i></button>
+                   </div>
+                </div>
+                <p class="balance mt-2 mb-0">฿${currentBalance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
             </div>
-            <p class="balance mt-2 mb-0">฿${currentBalance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-        </div>
-    </div>`;
+        </div>`;
             dashboardAccountList.append(card);
 
             transferFrom.append(`<option value="${account.id}">${account.name}</option>`);
@@ -305,16 +258,13 @@ const card = `
         const account = appData.accounts.find(acc => acc.id === accountId);
         if (!account) return;
 
-        // เปลี่ยนหัวข้อ Modal
         $('#accountModalTitle').html('<i class="fas fa-pencil-alt me-2"></i>แก้ไขบัญชี');
         
-        // เติมข้อมูลเดิมลงในฟอร์ม
         $('#accountId').val(account.id);
         $('#accountName').val(account.name);
         $('#accountType').val(account.type);
         $('#initialBalance').val(account.initialBalance);
 
-        // แสดง Modal
         accountModalInstance.show();
     }
 
@@ -325,7 +275,7 @@ const card = `
         const originalButtonHtml = submitButton.html(); 
         submitButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>กำลังบันทึก...');
 
-        const accountId = $('#accountId').val(); // ดึง ID จาก Hidden Input
+        const accountId = $('#accountId').val();
 
         const accountData = {
             id: accountId ? parseInt(accountId) : Date.now(),
@@ -340,22 +290,20 @@ const card = `
              return;
         }
         
-        const isEditing = !!accountId; // ตรวจสอบว่าเป็นการแก้ไขหรือไม่
+        const isEditing = !!accountId;
         const successMessage = isEditing ? 'แก้ไขบัญชีเรียบร้อยแล้ว' : 'เพิ่มบัญชีเรียบร้อยแล้ว';
 
         const handleSuccess = () => {
             if (isEditing) {
-                // อัปเดตข้อมูลใน appData
                 const index = appData.accounts.findIndex(acc => acc.id === accountData.id);
                 if (index !== -1) appData.accounts[index] = { ...appData.accounts[index], ...accountData };
             } else {
-                // เพิ่มข้อมูลใหม่ (ถ้ายังไม่ได้เพิ่ม)
                 if (!appData.accounts.some(acc => acc.id === accountData.id)) {
                     appData.accounts.push({ ...accountData, icon: 'fa-wallet' });
                 }
             }
             $('#accountForm')[0].reset();
-            $('#accountId').val(''); // ล้าง ID ทุกครั้ง
+            $('#accountId').val('');
             loadAccounts();
             submitButton.prop('disabled', false).html(originalButtonHtml);
         };
@@ -378,19 +326,18 @@ const card = `
         }
     }
     
-function deleteAccount(accountId) {
+    function deleteAccount(accountId) {
         const account = appData.accounts.find(acc => acc.id === accountId);
         if (!account) return;
 
-        const income = appData.transactions.filter(t => t.accountId == account.id && t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-        const expense = appData.transactions.filter(t => t.accountId == account.id && t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-        const transferIn = appData.transfers.filter(t => t.to == account.id).reduce((sum, t) => sum + t.amount, 0);
-        const transferOut = appData.transfers.filter(t => t.from == account.id).reduce((sum, t) => sum + t.amount, 0);
-        const currentBalance = account.initialBalance + income - expense + transferIn - transferOut;
+        const currentBalance = appData.transactions.reduce((balance, t) => {
+            if (t.type === 'income' && String(t.accountId) === String(account.id)) return balance + t.amount;
+            if (t.type === 'expense' && String(t.accountId) === String(account.id)) return balance - t.amount;
+            if (t.type === 'transfer' && String(t.to) === String(account.id)) return balance + t.amount;
+            if (t.type === 'transfer' && String(t.from) === String(account.id)) return balance - t.amount;
+            return balance;
+        }, account.initialBalance);
 
-        // --- ส่วนที่แก้ไข ---
-        // เปลี่ยนจากการเปรียบเทียบ !== 0 มาเป็นการตรวจสอบค่าที่น้อยมากๆ
-        // เพื่อป้องกันปัญหา Floating Point Precision
         if (Math.abs(currentBalance) > 0.001) { 
             Swal.fire({
                 icon: 'error',
@@ -399,11 +346,13 @@ function deleteAccount(accountId) {
             });
             return;
         }
-        // ------------------
 
         const accountIdStr = String(accountId);
-        const hasHistory = appData.transactions.some(t => String(t.accountId) === accountIdStr) || 
-                           appData.transfers.some(t => String(t.from) === accountIdStr || String(t.to) === accountIdStr);
+        const hasHistory = appData.transactions.some(t => 
+            String(t.accountId) === accountIdStr || 
+            String(t.from) === accountIdStr || 
+            String(t.to) === accountIdStr
+        );
 
         const confirmationConfig = {
             title: 'ยืนยันการลบ',
@@ -448,31 +397,11 @@ function deleteAccount(accountId) {
     // ===================================================================================
     // TRANSFERS MANAGEMENT
     // ===================================================================================
-    function loadTransfers() {
-      const tableBody = $('#transfersHistoryTable tbody');
-      tableBody.empty();
-      appData.transfers.slice().reverse().forEach(t => {
-          const fromAcc = appData.accounts.find(a => a.id == t.from)?.name || 'N/A';
-          const toAcc = appData.accounts.find(a => a.id == t.to)?.name || 'N/A';
-          const row = `
-            <tr>
-              <td>${new Date(t.date).toLocaleDateString('th-TH')}</td>
-              <td>${fromAcc}</td>
-              <td>${toAcc}</td>
-              <td>฿${t.amount.toLocaleString()}</td>
-              <td>${t.description}</td>
-            </tr>`;
-          tableBody.append(row);
-      });
-    }
-    
-function saveTransfer(e) {
+    function saveTransfer(e) {
         e.preventDefault();
         
-        // --- ส่วนที่เพิ่มเข้ามา ---
         const submitButton = $('#saveTransferBtn');
         const originalButtonHtml = submitButton.html();
-        // ------------------
 
         const fromId = $('#transferFrom').val();
         const toId = $('#transferTo').val();
@@ -482,47 +411,46 @@ function saveTransfer(e) {
             return;
         }
 
-        // --- เพิ่มเข้ามา: เปลี่ยนปุ่มเป็นสถานะ "กำลังโหลด" ---
         submitButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>กำลังโอน...');
         const resetButton = () => submitButton.prop('disabled', false).html(originalButtonHtml);
-        // ------------------------------------------
 
         const newTransfer = {
             id: Date.now(),
             date: $('#transferDate').val() || new Date().toISOString().split('T')[0],
+            type: 'transfer',
             from: fromId,
             to: toId,
             amount: parseFloat($('#transferAmount').val()),
-            description: $('#transferDescription').val()
+            description: $('#transferDescription').val(),
+            category: null,
+            accountId: null
         };
         
-        appData.transfers.push(newTransfer);
+        appData.transactions.push(newTransfer);
 
         const handleSuccess = () => {
             $('#transferForm')[0].reset();
-            loadAccounts();
-            loadTransfers();
-            resetButton(); // <-- คืนค่าปุ่ม
+            updateDashboard();
+            loadTransactionHistory();
+            resetButton();
+            transferModalInstance.hide();
         };
 
         if (isGoogleSheetsMode) {
             google.script.run
                 .withSuccessHandler(response => {
-                    Swal.fire('สำเร็จ!', 'บันทึกการโอนเงินเรียบร้อยแล้ว', 'success').then(() => {
-                        transferModalInstance.hide();
-                    });
+                    Swal.fire('สำเร็จ!', 'บันทึกการโอนเงินเรียบร้อยแล้ว', 'success');
                     handleSuccess();
                 })
                 .withFailureHandler(err => {
+                    appData.transactions = appData.transactions.filter(t => t.id !== newTransfer.id);
                     Swal.fire('ผิดพลาด', 'ไม่สามารถบันทึกได้', 'error');
-                    resetButton(); // <-- คืนค่าปุ่มเมื่อ Error
+                    resetButton();
                 })
-                .saveTransfer(newTransfer);
+                .saveMultipleTransactions([newTransfer]);
         } else {
             saveData();
-            Swal.fire('สำเร็จ!', 'บันทึกการโอนเงินเรียบร้อยแล้ว', 'success').then(() => {
-                transferModalInstance.hide();
-            });
+            Swal.fire('สำเร็จ!', 'บันทึกการโอนเงินเรียบร้อยแล้ว', 'success');
             handleSuccess();
         }
     }
@@ -576,118 +504,113 @@ function saveTransfer(e) {
         }
     }
 
-        function loadCategories() {
-            const incomeList = $('#incomeList');
-            const expenseList = $('#expenseList');
-            const filterCategory = $('#filterCategory');
+    function loadCategories() {
+        const incomeList = $('#incomeList');
+        const expenseList = $('#expenseList');
+        const filterCategory = $('#filterCategory');
 
-            incomeList.empty();
-            expenseList.empty();
-            filterCategory.empty();
+        incomeList.empty();
+        expenseList.empty();
+        filterCategory.empty();
 
-            // เพิ่ม option เริ่มต้น
-            filterCategory.append(`<option value="">-- ทั้งหมด --</option>`);
+        filterCategory.append(`<option value="">-- ทั้งหมด --</option>`);
 
-            const incomeCategories = appData.categories.filter(c => c.type === 'income');
-            const expenseCategories = appData.categories.filter(c => c.type === 'expense');
+        const incomeCategories = appData.categories.filter(c => c.type === 'income');
+        const expenseCategories = appData.categories.filter(c => c.type === 'expense');
 
-            function createCategoryCard(category) {
-                const typeText = category.type === 'income' ? 'รายรับ' : 'รายจ่าย';
-                const typeClass = category.type === 'income' ? 'success' : 'danger';
+        function createCategoryCard(category) {
+            const typeText = category.type === 'income' ? 'รายรับ' : 'รายจ่าย';
+            const typeClass = category.type === 'income' ? 'success' : 'danger';
 
-    return `
-        <div class="card mb-2">
-            <div class="card-body d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center">
-                    <div class="me-3" style="width: 20px; height: 20px; background-color: ${category.color}; border-radius: 50%;"></div>
-                    <div>
-                        <strong>${category.name}</strong>
-                        <br><small class="text-${typeClass}">${typeText}</small>
+        return `
+            <div class="card mb-2">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <div class="me-3" style="width: 20px; height: 20px; background-color: ${category.color}; border-radius: 50%;"></div>
+                        <div>
+                            <strong>${category.name}</strong>
+                            <br><small class="text-${typeClass}">${typeText}</small>
+                        </div>
                     </div>
+                    <button class="btn btn-danger btn-sm" onclick="deleteCategory(${category.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>
                 </div>
-                <button class="btn btn-danger btn-sm" onclick="deleteCategory(${category.id})">
-                    <i class="fas fa-trash"></i>
-                </button>
             </div>
-        </div>
-    `;
-}
+        `;
+    }
 
-            incomeCategories.forEach(category => {
-                incomeList.append(createCategoryCard(category));
-                filterCategory.append(`<option value="${category.name}">${category.name}</option>`);
-            });
+        incomeCategories.forEach(category => {
+            incomeList.append(createCategoryCard(category));
+            filterCategory.append(`<option value="${category.name}">${category.name}</option>`);
+        });
 
-            expenseCategories.forEach(category => {
-                expenseList.append(createCategoryCard(category));
-                filterCategory.append(`<option value="${category.name}">${category.name}</option>`);
-            });
-        }
+        expenseCategories.forEach(category => {
+            expenseList.append(createCategoryCard(category));
+            filterCategory.append(`<option value="${category.name}">${category.name}</option>`);
+        });
+    }
 
-        function deleteCategory(categoryId) {
+    function deleteCategory(categoryId) {
+      Swal.fire({
+          title: 'ยืนยันการลบ',
+          text: 'คุณต้องการลบหมวดหมู่นี้ใช่หรือไม่?',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: 'ลบ',
+          cancelButtonText: 'ยกเลิก'
+      }).then((result) => {
+          if (!result.isConfirmed) return;
+
           Swal.fire({
-              title: 'ยืนยันการลบ',
-              text: 'คุณต้องการลบหมวดหมู่นี้ใช่หรือไม่?',
-              icon: 'warning',
-              showCancelButton: true,
-              confirmButtonText: 'ลบ',
-              cancelButtonText: 'ยกเลิก'
-          }).then((result) => {
-              if (!result.isConfirmed) return;
+            title: 'กำลังลบข้อมูล...',
+            allowOutsideClick: false,
+            showConfirmButton: false
+          });
+
+          Swal.showLoading();
+
+          appData.categories = appData.categories.filter(cat => cat.id !== categoryId);
+
+          if (isGoogleSheetsMode) {
+              google.script.run
+                  .withSuccessHandler(function (response) {
+                      loadCategories();
+                      updateAllTransactionCards();
+                      Swal.fire({
+                          icon: 'success',
+                          title: 'สำเร็จ',
+                          text: 'ลบหมวดหมู่เรียบร้อยแล้ว'
+                      });
+                  })
+                  .withFailureHandler(function (error) {
+                      console.error('❌ เกิดข้อผิดพลาดในการลบหมวดหมู่:', error);
+                      Swal.fire({
+                          icon: 'error',
+                          title: 'ข้อผิดพลาด',
+                          text: 'ไม่สามารถลบหมวดหมู่ได้ กรุณาลองอีกครั้ง'
+                      });
+                  })
+                  .deleteCategory(categoryId);
+          } else {
+              saveData();
+              loadCategories();
+              updateAllTransactionCards();
 
               Swal.fire({
-                title: 'กำลังลบข้อมูล...',
-                allowOutsideClick: false,
-                showConfirmButton: false
+                  icon: 'success',
+                  title: 'สำเร็จ',
+                  text: 'ลบหมวดหมู่เรียบร้อยแล้ว'
               });
+          }
+      });
+    }
 
-              Swal.showLoading();
-
-              // ลบออกจาก memory ก่อน
-              appData.categories = appData.categories.filter(cat => cat.id !== categoryId);
-
-              if (isGoogleSheetsMode) {
-                  google.script.run
-                      .withSuccessHandler(function (response) {
-
-                          // โหลดข้อมูลใหม่จาก Google Sheets เพื่อ sync UI
-                          loadCategories();
-                          updateAllTransactionCards();
-
-                          Swal.fire({
-                              icon: 'success',
-                              title: 'สำเร็จ',
-                              text: 'ลบหมวดหมู่เรียบร้อยแล้ว'
-                          });
-                      })
-                      .withFailureHandler(function (error) {
-                          console.error('❌ เกิดข้อผิดพลาดในการลบหมวดหมู่:', error);
-                          Swal.fire({
-                              icon: 'error',
-                              title: 'ข้อผิดพลาด',
-                              text: 'ไม่สามารถลบหมวดหมู่ได้ กรุณาลองอีกครั้ง'
-                          });
-                      })
-                      .deleteCategory(categoryId); // ← เรียกฟังก์ชัน Apps Script
-              } else {
-                  // Local mode
-                  saveData();
-                  loadCategories();
-                  updateAllTransactionCards();
-
-                  Swal.fire({
-                      icon: 'success',
-                      title: 'สำเร็จ',
-                      text: 'ลบหมวดหมู่เรียบร้อยแล้ว'
-                  });
-              }
-          });
-      }
-        function updateAllTransactionCards() {
-            $('.transaction-card .type-select').each(function() {
-                updateCategoriesFromType(this);
-            });
-        }
+    function updateAllTransactionCards() {
+        $('.transaction-card .type-select').each(function() {
+            updateCategoriesFromType(this);
+        });
+    }
     
     // ===================================================================================
     // TRANSACTION MANAGEMENT
@@ -744,23 +667,25 @@ function saveTransfer(e) {
         $('#transactionCards').append(card);
         updateCategoriesFromType($(`div[data-card-id="${cardId}"] .type-select`)[0]);
     }
+
     function removeTransactionCard(cardId) {
         $(`div[data-card-id="${cardId}"]`).remove();
     }
-        function updateCategoriesFromType(selectElement) {
-            const selectedType = $(selectElement).val();
-            const categorySelect = $(selectElement).closest('.transaction-card').find('.category-select');
-            
-            categorySelect.empty();
-            categorySelect.append('<option value="">เลือกหมวดหมู่</option>');
-            
-            if (selectedType) {
-                const filteredCategories = appData.categories.filter(cat => cat.type === selectedType);
-                filteredCategories.forEach(category => {
-                    categorySelect.append(`<option value="${category.name}">${category.name}</option>`);
-                });
-            }
+
+    function updateCategoriesFromType(selectElement) {
+        const selectedType = $(selectElement).val();
+        const categorySelect = $(selectElement).closest('.transaction-card').find('.category-select');
+        
+        categorySelect.empty();
+        categorySelect.append('<option value="">เลือกหมวดหมู่</option>');
+        
+        if (selectedType) {
+            const filteredCategories = appData.categories.filter(cat => cat.type === selectedType);
+            filteredCategories.forEach(category => {
+                categorySelect.append(`<option value="${category.name}">${category.name}</option>`);
+            });
         }
+    }
 
     function saveTransactions(e) {
         e.preventDefault();
@@ -800,11 +725,6 @@ function saveTransfer(e) {
                     accountId: accountIds[i]
                 });
             }
-
-            const submitButton = $('#saveTransactionsBtn');
-            const originalButtonHtml = submitButton.html();
-            submitButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>กำลังบันทึก...');
-            const resetButton = () => submitButton.prop('disabled', false).html(originalButtonHtml);
             
             appData.transactions.push(...newTransactions);
             
@@ -817,6 +737,7 @@ function saveTransfer(e) {
                         loadTransactionHistory();
                         populateDashboardMonths();
                         Swal.fire('สำเร็จ!', 'บันทึกรายการเรียบร้อยแล้ว', 'success');
+                        transactionModalInstance.hide();
                     })
                     .withFailureHandler(error => {
                         console.error('Error saving transactions:', error);
@@ -825,7 +746,6 @@ function saveTransfer(e) {
                         Swal.fire('เกิดข้อผิดพลาด!', 'ไม่สามารถบันทึกข้อมูลได้', 'error');
                     })
                     .saveMultipleTransactions(newTransactions);
-                    transactionModalInstance.hide();
             } else {
                 saveData();
                 $('#transactionCards').empty();
@@ -850,15 +770,12 @@ function saveTransfer(e) {
         }).then((result) => {
             if (!result.isConfirmed) return;
 
-            // *** QA Refactor Point: Backup for Rollback ***
             const transactionToDelete = appData.transactions.find(t => t.id === transactionId);
             const transactionIndex = appData.transactions.findIndex(t => t.id === transactionId);
-            if (!transactionToDelete) return; // ไม่พบรายการที่จะลบ
+            if (!transactionToDelete) return;
 
-            // ลบออกจาก Memory ชั่วคราว (Optimistic UI)
             appData.transactions.splice(transactionIndex, 1);
             
-            // อัปเดตตารางทันทีเพื่อให้ผู้ใช้เห็นผลลัพธ์
             loadTransactionHistory();
 
             if (isGoogleSheetsMode) {
@@ -866,17 +783,13 @@ function saveTransfer(e) {
                 
                 google.script.run
                     .withSuccessHandler(function(response) {
-                        updateDashboard(); // อัปเดต Dashboard หลังลบสำเร็จ
+                        updateDashboard();
                         Swal.fire('สำเร็จ!', 'ลบรายการเรียบร้อยแล้ว', 'success');
                     })
                     .withFailureHandler(function(error) {
                         console.error('❌ Error deleting transaction:', error);
-
-                        // *** QA Refactor Point: Rollback on Failure ***
-                        // หากลบไม่สำเร็จ, นำข้อมูลที่สำรองไว้กลับคืนสู่ตำแหน่งเดิม
                         appData.transactions.splice(transactionIndex, 0, transactionToDelete);
-                        loadTransactionHistory(); // โหลดตารางใหม่เพื่อแสดงข้อมูลที่กลับมา
-
+                        loadTransactionHistory();
                         Swal.fire('เกิดข้อผิดพลาด!', 'ไม่สามารถลบรายการได้', 'error');
                     })
                     .deleteTransaction(transactionId);
@@ -919,177 +832,169 @@ function saveTransfer(e) {
             updateIncomeChart();
             updateExpenseChart();
         }
-function updateBudgetChart() {
-    const selectedMonth = $('#dashboardMonth').val() || new Date().toISOString().slice(0, 7);
-    const currentBudgets = appData.budgets[selectedMonth] || [];
-    const expenseCategories = appData.categories.filter(cat => cat.type === 'expense');
-    
-    const labels = [];
-    const budgetData = [];
-    const actualData = [];
-    
-    expenseCategories.forEach(category => {
-        const budget = currentBudgets.find(b => b.categoryId === category.id);
-        const budgetAmount = budget ? budget.amount : 0;
+    function updateBudgetChart() {
+        const selectedMonth = $('#dashboardMonth').val() || new Date().toISOString().slice(0, 7);
+        const currentBudgets = appData.budgets[selectedMonth] || [];
+        const expenseCategories = appData.categories.filter(cat => cat.type === 'expense');
         
-        const actualAmount = appData.transactions
-            .filter(t => t.date.startsWith(selectedMonth) && t.category === category.name && t.type === 'expense')
-            .reduce((sum, t) => sum + t.amount, 0);
+        const labels = [];
+        const budgetData = [];
+        const actualData = [];
         
-        if (budgetAmount > 0 || actualAmount > 0) {
-            labels.push(category.name);
-            budgetData.push(budgetAmount);
-            actualData.push(actualAmount);
-        }
-    });
+        expenseCategories.forEach(category => {
+            const budget = currentBudgets.find(b => b.categoryId === category.id);
+            const budgetAmount = budget ? budget.amount : 0;
+            
+            const actualAmount = appData.transactions
+                .filter(t => t.date.startsWith(selectedMonth) && t.category === category.name && t.type === 'expense')
+                .reduce((sum, t) => sum + t.amount, 0);
+            
+            if (budgetAmount > 0 || actualAmount > 0) {
+                labels.push(category.name);
+                budgetData.push(budgetAmount);
+                actualData.push(actualAmount);
+            }
+        });
 
-    // --- ส่วนที่เพิ่ม/แก้ไขสำหรับ Dark Mode ---
-    const isDarkMode = $('body').attr('data-theme') === 'dark';
-    const chartTextColor = isDarkMode ? '#c9d1d9' : '#4a4a4a';
-    const gridColor = isDarkMode ? 'rgba(201, 209, 217, 0.2)' : 'rgba(0, 0, 0, 0.1)';
-    // ------------------------------------
-    
-    const ctx = document.getElementById('budgetChart').getContext('2d');
-    
-    if (charts.budget) {
-        charts.budget.destroy();
-    }
-    
-    charts.budget = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'งบประมาณ',
-                    data: budgetData,
-                    backgroundColor: 'rgba(66, 165, 245, 0.7)',
-                    borderColor: 'rgba(66, 165, 245, 1)',
-                    borderWidth: 1
-                },
-                {
-                    label: 'ใช้จริง',
-                    data: actualData,
-                    backgroundColor: 'rgba(245, 66, 66, 0.7)',
-                    borderColor: 'rgba(245, 66, 66, 1)',
-                    borderWidth: 1
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            // --- ส่วนที่เพิ่ม/แก้ไขสำหรับ Dark Mode ---
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        color: chartTextColor, // กำหนดสีตัวอักษรแกน Y
-                        callback: function(value) {
-                            return '฿' + value.toLocaleString();
-                        }
+        const isDarkMode = $('body').attr('data-theme') === 'dark';
+        const chartTextColor = isDarkMode ? '#c9d1d9' : '#4a4a4a';
+        const gridColor = isDarkMode ? 'rgba(201, 209, 217, 0.2)' : 'rgba(0, 0, 0, 0.1)';
+        
+        const ctx = document.getElementById('budgetChart').getContext('2d');
+        
+        if (charts.budget) {
+            charts.budget.destroy();
+        }
+        
+        charts.budget = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'งบประมาณ',
+                        data: budgetData,
+                        backgroundColor: 'rgba(66, 165, 245, 0.7)',
+                        borderColor: 'rgba(66, 165, 245, 1)',
+                        borderWidth: 1
                     },
-                    grid: {
-                        color: gridColor // กำหนดสีเส้น Grid ของแกน Y
+                    {
+                        label: 'ใช้จริง',
+                        data: actualData,
+                        backgroundColor: 'rgba(245, 66, 66, 0.7)',
+                        borderColor: 'rgba(245, 66, 66, 1)',
+                        borderWidth: 1
                     }
-                },
-                x: {
-                     ticks: {
-                        color: chartTextColor // กำหนดสีตัวอักษรแกน X
-                    },
-                    grid: {
-                        color: gridColor // กำหนดสีเส้น Grid ของแกน X
-                    }
-                }
+                ]
             },
-            plugins: {
-                legend: {
-                    labels: {
-                        color: chartTextColor // กำหนดสีตัวอักษรของ Legend
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: chartTextColor,
+                            callback: function(value) {
+                                return '฿' + value.toLocaleString();
+                            }
+                        },
+                        grid: {
+                            color: gridColor
+                        }
+                    },
+                    x: {
+                         ticks: {
+                            color: chartTextColor
+                        },
+                        grid: {
+                            color: gridColor
+                        }
                     }
                 },
-            // ------------------------------------
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.dataset.label + ': ฿' + context.parsed.y.toLocaleString();
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: chartTextColor
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ฿' + context.parsed.y.toLocaleString();
+                            }
                         }
                     }
                 }
             }
-        }
-    });
-}
-
-function updateIncomeChart() {
-    const selectedMonth = $('#dashboardMonth').val() || new Date().toISOString().slice(0, 7);
-
-    const incomeTransactions = appData.transactions.filter(t => 
-        t.date.startsWith(selectedMonth) && t.type === 'income'
-    );
-
-    const categoryTotals = {};
-    const categoryColors = {};
-
-    incomeTransactions.forEach(transaction => {
-        if (!categoryTotals[transaction.category]) {
-            categoryTotals[transaction.category] = 0;
-            const category = appData.categories.find(cat => cat.name === transaction.category);
-            categoryColors[transaction.category] = category ? category.color : '#66bb6a'; // default สีเขียว
-        }
-        categoryTotals[transaction.category] += transaction.amount;
-    });
-
-    const labels = Object.keys(categoryTotals);
-    const data = Object.values(categoryTotals);
-    const colors = labels.map(label => categoryColors[label]);
-
-    // --- ส่วนที่เพิ่ม/แก้ไขสำหรับ Dark Mode ---
-    const isDarkMode = $('body').attr('data-theme') === 'dark';
-    const chartTextColor = isDarkMode ? '#c9d1d9' : '#4a4a4a';
-    // ------------------------------------
-
-    const ctx = document.getElementById('incomeChart').getContext('2d');
-
-    if (charts.income) {
-        charts.income.destroy();
+        });
     }
 
-    charts.income = new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: data,
-                backgroundColor: colors,
-                borderColor: colors.map(color => color + 'FF'),
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                // --- ส่วนที่เพิ่ม/แก้ไขสำหรับ Dark Mode ---
-                legend: {
-                    labels: {
-                        color: chartTextColor // กำหนดสีตัวอักษรของ Legend
-                    }
-                },
-                // ------------------------------------
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((context.parsed / total) * 100).toFixed(1);
-                            return `${context.label}: ฿${context.parsed.toLocaleString()} (${percentage}%)`;
+    function updateIncomeChart() {
+        const selectedMonth = $('#dashboardMonth').val() || new Date().toISOString().slice(0, 7);
+
+        const incomeTransactions = appData.transactions.filter(t => 
+            t.date.startsWith(selectedMonth) && t.type === 'income'
+        );
+
+        const categoryTotals = {};
+        const categoryColors = {};
+
+        incomeTransactions.forEach(transaction => {
+            if (!categoryTotals[transaction.category]) {
+                categoryTotals[transaction.category] = 0;
+                const category = appData.categories.find(cat => cat.name === transaction.category);
+                categoryColors[transaction.category] = category ? category.color : '#66bb6a';
+            }
+            categoryTotals[transaction.category] += transaction.amount;
+        });
+
+        const labels = Object.keys(categoryTotals);
+        const data = Object.values(categoryTotals);
+        const colors = labels.map(label => categoryColors[label]);
+
+        const isDarkMode = $('body').attr('data-theme') === 'dark';
+        const chartTextColor = isDarkMode ? '#c9d1d9' : '#4a4a4a';
+
+        const ctx = document.getElementById('incomeChart').getContext('2d');
+
+        if (charts.income) {
+            charts.income.destroy();
+        }
+
+        charts.income = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: colors,
+                    borderColor: colors.map(color => color + 'FF'),
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: chartTextColor
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                return `${context.label}: ฿${context.parsed.toLocaleString()} (${percentage}%)`;
+                            }
                         }
                     }
                 }
             }
-        }
-    });
-}
+        });
+    }
         function updateExpenseChart() {
             const selectedMonth = $('#dashboardMonth').val() || new Date().toISOString().slice(0, 7);
             const expenseTransactions = appData.transactions.filter(t => 
@@ -1167,11 +1072,8 @@ function updateIncomeChart() {
                     .reduce((sum, t) => sum + t.amount, 0);
 
                 const percentage = budget.amount > 0 ? (actualAmount / budget.amount) * 100 : 0;
-
-                // ตัวเลขสีแดงถ้าเกินงบ
                 const amountClass = percentage > 100 ? 'text-danger' : 'text-muted';
 
-                // กำหนดสีของ progress bar ตามเงื่อนไข
                 let progressClass = 'bg-success';
                 if (percentage > 100) {
                     progressClass = 'bg-danger';
@@ -1206,7 +1108,6 @@ function updateIncomeChart() {
             const incomeData = [];
             const expenseData = [];
             
-            // Calculate data for each month
             for (let month = 0; month < 12; month++) {
                 const monthStr = `${currentYear}-${String(month + 1).padStart(2, '0')}`;
                 
@@ -1345,84 +1246,82 @@ function updateIncomeChart() {
         }
     
     // ===================================================================================
-    // TRANSACTION HISTORY
+    // TRANSACTION HISTORY (ปรับปรุงใหม่ทั้งหมด)
     // ===================================================================================
-        function loadTransactionHistory() {
-            if (historyDataTable) {
-                historyDataTable.destroy();
-            }
+    function loadTransactionHistory() {
+        const cardContainer = $('#transactionCardList');
+        cardContainer.empty();
 
-            const tableBody = $('#historyTable tbody');
-            tableBody.empty();
+        // ** REFACTOR: เปลี่ยนการกรองข้อมูลมาใช้ historyMonthSelect **
+        const selectedMonth = $('#historyMonthSelect').val();
 
-            const selectedCategory = $('#filterCategory').val();
-            const startDate = $('#filterStartDate').val() ? new Date($('#filterStartDate').val()) : null;
-            const endDate = $('#filterEndDate').val() ? new Date($('#filterEndDate').val()) : null;
+        // กรองข้อมูลเฉพาะเดือนที่เลือก หรือถ้าไม่มีการเลือก ให้แสดงทั้งหมด
+        const filteredTransactions = selectedMonth 
+            ? appData.transactions.filter(t => t.date.startsWith(selectedMonth))
+            : appData.transactions;
 
-            const filteredTransactions = appData.transactions.filter(transaction => {
-                let match = true;
+        // เรียงลำดับจากใหม่ไปเก่า
+        const sortedTransactions = filteredTransactions.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
 
-                if (selectedCategory && transaction.category !== selectedCategory) {
-                    match = false;
-                }
-
-                const transDate = new Date(transaction.date);
-                if (startDate && transDate < startDate) {
-                    match = false;
-                }
-                if (endDate) {
-                    endDate.setHours(23, 59, 59, 999);
-                    if (transDate > endDate) {
-                        match = false;
-                    }
-                }
-
-                return match;
-            }).slice().reverse();
-
-            filteredTransactions.forEach(transaction => {
-                const typeText = transaction.type === 'income' ? 'รายรับ' : 'รายจ่าย';
-                const typeClass = transaction.type === 'income' ? 'success' : 'danger';
-                const amountText = transaction.type === 'income' ? '+' : '-';
-
-                const row = `
-                    <tr>
-                        <td>${new Date(transaction.date).toLocaleDateString('th-TH')}</td>
-                        <td>${transaction.category}</td>
-                        <td><span class="badge bg-${typeClass}">${typeText}</span></td>
-                        <td>${transaction.description}</td>
-                        <td class="text-end text-${typeClass}">${amountText}฿${transaction.amount.toLocaleString()}</td>
-                        <td class="text-center">
-                            <button class="btn btn-danger btn-sm" onclick="deleteTransaction(${transaction.id})">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-                tableBody.append(row);
-            });
-
-            historyDataTable = $('#historyTable').DataTable({
-                language: {
-                    url: 'https://cdn.datatables.net/plug-ins/1.13.6/i18n/th.json'
-                },
-                order: [[0, 'desc']],
-                pageLength: 10,
-                responsive: true
-            });
+        if (sortedTransactions.length === 0) {
+            cardContainer.html('<p class="text-center text-muted mt-3">ไม่พบรายการในเดือนนี้</p>');
+            return;
         }
 
-        $('#filterCategory, #filterStartDate, #filterEndDate').on('change', function () {
-            loadTransactionHistory();
-        });
+        sortedTransactions.forEach(transaction => {
+            let iconClass, iconName, title, subtitle, amountClass, amountPrefix, amountText;
 
-        // ปุ่มรีเซ็ตตัวกรอง
-        $('#resetFilter').on('click', function () {
-            $('#filterCategory').val('');
-            $('#filterStartDate').val('');
-            $('#filterEndDate').val('');
-            loadTransactionHistory();
+            const transactionDate = new Date(transaction.date).toLocaleDateString('th-TH', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+
+            if (transaction.type === 'transfer') {
+                const fromAcc = appData.accounts.find(a => a.id == transaction.from)?.name || 'N/A';
+                const toAcc = appData.accounts.find(a => a.id == transaction.to)?.name || 'N/A';
+                
+                iconClass = 'transfer';
+                iconName = 'fa-exchange-alt';
+                title = 'โอนเงิน';
+                subtitle = `จาก: ${fromAcc} ไปยัง: ${toAcc}`;
+                amountClass = 'text-primary';
+                amountPrefix = '';
+                amountText = `฿${transaction.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+            } else { // Income & Expense
+                iconClass = transaction.type;
+                iconName = transaction.type === 'income' ? 'fa-arrow-up' : 'fa-arrow-down';
+                title = transaction.category;
+                subtitle = transaction.description || transactionDate;
+                amountClass = transaction.type === 'income' ? 'text-success' : 'text-danger';
+                amountPrefix = transaction.type === 'income' ? '+' : '-';
+                amountText = `฿${transaction.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+            }
+
+            const cardHtml = `
+                <div class="transaction-card">
+                    <div class="transaction-card-icon ${iconClass}">
+                        <i class="fas ${iconName}"></i>
+                    </div>
+                    <div class="transaction-card-details">
+                        <h6>${title}</h6>
+                        <small>${subtitle}</small>
+                    </div>
+                    <div class="transaction-card-amount ${amountClass}">
+                        ${amountPrefix}${amountText}
+                    </div>
+                    <div class="transaction-card-delete">
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteTransaction(${transaction.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            cardContainer.append(cardHtml);
         });
+    }
+
     
     // ===================================================================================
     // TAX MANAGEMENT
@@ -1552,9 +1451,8 @@ function updateIncomeChart() {
                                 text: 'ไม่สามารถล้างข้อมูลได้ กรุณาลองอีกครั้ง'
                             });
                         })
-                        .clearAllData(); // เรียก Apps Script
+                        .clearAllData();
                 } else {
-                    // Local mode
                     localStorage.removeItem('financeApp');
                     google.script.run.withSuccessHandler((url)=>{
                       window.open(url,'_top')
@@ -1568,26 +1466,24 @@ function updateIncomeChart() {
         const yearSelect = $('#budgetYearSelect');
 
         const now = new Date();
-        const currentMonth = now.getMonth() + 1; // 1–12
+        const currentMonth = now.getMonth() + 1;
         const currentYear = now.getFullYear();
 
-        // Populate months if empty
         if (monthSelect.children().length === 0) {
             const monthNames = [
                 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
                 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
             ];
             monthNames.forEach((monthName, index) => {
-                const monthValue = (index + 1).toString().padStart(2, '0'); // 01–12
+                const monthValue = (index + 1).toString().padStart(2, '0');
                 const selected = (index + 1 === currentMonth) ? 'selected' : '';
                 monthSelect.append(`<option value="${monthValue}" ${selected}>${monthName}</option>`);
             });
         }
 
-        // Populate years if empty
         if (yearSelect.children().length === 0) {
             for (let year = currentYear - 2; year <= currentYear + 5; year++) {
-                const displayYear = year + 543; // Convert to Buddhist year
+                const displayYear = year + 543;
                 const selected = (year === currentYear) ? 'selected' : '';
                 yearSelect.append(`<option value="${year}" ${selected}>${displayYear}</option>`);
             }
@@ -1599,22 +1495,18 @@ function updateIncomeChart() {
 
             const selectedMonth = $('#budgetMonthSelect').val();
             const selectedYear = $('#budgetYearSelect').val();
-            const selectedMonthYear = `${selectedYear}-${selectedMonth.padStart(2, '0')}`; // YYYY-MM
+            const selectedMonthYear = `${selectedYear}-${selectedMonth.padStart(2, '0')}`;
 
             const budgetTableBody = $('#budgetTableBody');
             budgetTableBody.empty();
 
-            // Filter หมวดหมู่ expense
             const expenseCategories = appData.categories.filter(cat => cat.type === 'expense');
-
-            // ดึงงบประมาณของเดือนนี้
             const currentBudgets = appData.budgets[selectedMonthYear] || [];
 
             expenseCategories.forEach(category => {
                 const budget = currentBudgets.find(b => b.categoryId === category.id);
                 const budgetAmount = budget ? budget.amount : 0;
 
-                // คำนวณค่าใช้จริง
                 const actualAmount = appData.transactions
                     .filter(t => t.date.startsWith(selectedMonthYear) && t.category === category.name && t.type === 'expense')
                     .reduce((sum, t) => sum + t.amount, 0);
@@ -1622,21 +1514,21 @@ function updateIncomeChart() {
                 const remaining = budgetAmount - actualAmount;
                 const remainingClass = remaining >= 0 ? 'text-success' : 'text-danger';
 
-const row = `
-    <tr>
-        <td>
-            <div class="d-flex align-items-center">
-                <div class="me-2" style="width: 15px; height: 15px; background-color: ${category.color}; border-radius: 50%;"></div>
-                ${category.name}
-            </div>
-        </td>
-        <td>
-            <input type="number" class="form-control" name="budget_${category.id}" value="${budgetAmount}" min="0" step="0.01">
-        </td>
-        <td class="text-end">฿${actualAmount.toLocaleString()}</td>
-        <td class="text-end ${remainingClass}">฿${remaining.toLocaleString()}</td>
-    </tr>
-`;
+    const row = `
+        <tr>
+            <td>
+                <div class="d-flex align-items-center">
+                    <div class="me-2" style="width: 15px; height: 15px; background-color: ${category.color}; border-radius: 50%;"></div>
+                    ${category.name}
+                </div>
+            </td>
+            <td>
+                <input type="number" class="form-control" name="budget_${category.id}" value="${budgetAmount}" min="0" step="0.01">
+            </td>
+            <td class="text-end">฿${actualAmount.toLocaleString()}</td>
+            <td class="text-end ${remainingClass}">฿${remaining.toLocaleString()}</td>
+        </tr>
+    `;
                 budgetTableBody.append(row);
             });
         }
@@ -1655,7 +1547,6 @@ const row = `
           const formData = new FormData(e.target);
           const budgets = [];
 
-          // เก็บงบประมาณจากฟอร์มสำหรับแต่ละหมวดหมู่ expense
           appData.categories
               .filter(cat => cat.type === 'expense')
               .forEach(category => {
@@ -1666,7 +1557,6 @@ const row = `
                   });
               });
 
-          // อัปเดต memory
           appData.budgets[selectedMonthYear] = budgets;
 
           const monthNames = [
@@ -1706,9 +1596,8 @@ const row = `
                           text: 'ไม่สามารถบันทึกงบประมาณได้ กรุณาลองอีกครั้ง'
                       });
                   })
-                  .saveBudget(selectedMonthYear, budgets); // เรียก Apps Script
+                  .saveBudget(selectedMonthYear, budgets);
           } else {
-              // Local mode
               saveData();
               updateDashboard();
               loadBudgetForm();
@@ -1720,84 +1609,104 @@ const row = `
               });
           }
       }
-        function updateCurrentMonth() {
-            const currentDate = new Date();
-            const monthNames = [
-                'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-                'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
-            ];
-            const monthText = `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear() + 543}`;
-            $('#currentMonth').text(monthText);
-            $('#budgetMonth').text(monthText);
-            $('#currentYear').text(currentDate.getFullYear() + 543);
-        }
-        function populateDashboardMonths() {
-            const monthSelect = $('#dashboardMonth');
-            const currentDate = new Date();
-            const currentMonth = currentDate.toISOString().slice(0, 7);
-            
-            // Get all unique months from transactions
-            const months = [...new Set(appData.transactions.map(t => t.date.slice(0, 7)))];
-            months.sort().reverse();
-            
-            // Add current month if not in list
-            if (!months.includes(currentMonth)) {
-                months.unshift(currentMonth);
-            }
-            
-            const monthNames = [
-                'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-                'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
-            ];
-            
-            monthSelect.empty();
-            months.forEach(month => {
-                const [year, monthNum] = month.split('-');
-                const monthName = monthNames[parseInt(monthNum) - 1];
-                const displayText = `${monthName} ${parseInt(year) + 543}`;
-                const option = `<option value="${month}">${displayText}</option>`;
-                monthSelect.append(option);
-            });
-            
-            monthSelect.val(currentMonth);
-        }
-
-/**
- * @name showConnectionStatus
- * @description แสดงแถบสถานะการเชื่อมต่อ (Online/Offline)
- * @param {boolean} isConnected - true หากเชื่อมต่อ Google Sheets, false หากเป็นโหมด Offline
- */
-function showConnectionStatus(isConnected) {
-    // ลบแถบสถานะเก่าออกไปก่อน เผื่อมีการเรียกซ้ำ
-    $('.connection-status-alert').remove();
-
-    let statusHtml;
-    
-    if (isConnected) {
-        // เมื่อเชื่อมต่อ Google Sheets สำเร็จ
-        statusHtml = `
-            <div class="alert alert-success alert-dismissible fade show connection-status-alert" role="alert">
-                <i class="fas fa-cloud-check me-2"></i>
-                <strong>ออนไลน์:</strong> เชื่อมต่อกับ Google Sheets สำเร็จ
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>`;
-    } else {
-        // เมื่อทำงานในโหมดออฟไลน์
-        statusHtml = `
-            <div class="alert alert-warning alert-dismissible fade show connection-status-alert" role="alert">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                <strong>ออฟไลน์:</strong> กำลังทำงานในโหมดออฟไลน์ ข้อมูลจะถูกบันทึกในเบราว์เซอร์
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>`;
+    function updateCurrentMonth() {
+        const currentDate = new Date();
+        const monthNames = [
+            'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+            'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+        ];
+        const monthText = `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear() + 543}`;
+        $('#currentMonth').text(monthText);
+        $('#budgetMonth').text(monthText);
+        $('#currentYear').text(currentDate.getFullYear() + 543);
     }
-    
-    // นำแถบสถานะไปแสดงที่ส่วนบนสุดของ .main-content
-    $('.main-content').prepend(statusHtml);
-    
-    // ตั้งเวลาให้แถบสถานะค่อยๆ หายไปเองใน 5 วินาที เพื่อไม่ให้รบกวนหน้าจอ
-    setTimeout(() => {
-        $('.connection-status-alert').fadeOut(500);
-    }, 5000);
-}
+    function populateDashboardMonths() {
+        const monthSelect = $('#dashboardMonth');
+        const currentDate = new Date();
+        const currentMonth = currentDate.toISOString().slice(0, 7);
+        
+        const months = [...new Set(appData.transactions.map(t => t.date.slice(0, 7)))];
+        months.sort().reverse();
+        
+        if (!months.includes(currentMonth)) {
+            months.unshift(currentMonth);
+        }
+        
+        const monthNames = [
+            'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+            'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+        ];
+        
+        monthSelect.empty();
+        months.forEach(month => {
+            const [year, monthNum] = month.split('-');
+            const monthName = monthNames[parseInt(monthNum) - 1];
+            const displayText = `${monthName} ${parseInt(year) + 543}`;
+            const option = `<option value="${month}">${displayText}</option>`;
+            monthSelect.append(option);
+        });
+        
+        monthSelect.val(currentMonth);
+    }
+
+    function populateHistoryMonths() {
+        const monthSelect = $('#historyMonthSelect');
+        const currentDate = new Date();
+        const currentMonth = currentDate.toISOString().slice(0, 7);
+
+        // ดึงข้อมูลเดือนทั้งหมดที่มีการทำรายการ
+        const months = [...new Set(appData.transactions.map(t => t.date.slice(0, 7)))];
+        months.sort((a, b) => b.localeCompare(a)); // เรียงจากใหม่ไปเก่า
+
+        // เพิ่มเดือนปัจจุบันเข้าไป ถ้ายังไม่มี
+        if (!months.includes(currentMonth)) {
+            months.unshift(currentMonth);
+        }
+        
+        const monthNames = [
+            'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+            'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+        ];
+        
+        monthSelect.empty();
+        months.forEach(month => {
+            const [year, monthNum] = month.split('-');
+            const monthName = monthNames[parseInt(monthNum) - 1];
+            const displayText = `${monthName} ${parseInt(year) + 543}`;
+            const option = `<option value="${month}">${displayText}</option>`;
+            monthSelect.append(option);
+        });
+        
+        // ตั้งค่าให้เดือนปัจจุบันเป็นค่าเริ่มต้น
+        monthSelect.val(currentMonth);
+    }
+
+    function showConnectionStatus(isConnected) {
+        $('.connection-status-alert').remove();
+
+        let statusHtml;
+        
+        if (isConnected) {
+            statusHtml = `
+                <div class="alert alert-success alert-dismissible fade show connection-status-alert" role="alert">
+                    <i class="fas fa-cloud-check me-2"></i>
+                    <strong>ออนไลน์:</strong> เชื่อมต่อกับ Google Sheets สำเร็จ
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>`;
+        } else {
+            statusHtml = `
+                <div class="alert alert-warning alert-dismissible fade show connection-status-alert" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>ออฟไลน์:</strong> กำลังทำงานในโหมดออฟไลน์ ข้อมูลจะถูกบันทึกในเบราว์เซอร์
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>`;
+        }
+        
+        $('.main-content').prepend(statusHtml);
+        
+        setTimeout(() => {
+            $('.connection-status-alert').fadeOut(500);
+        }, 5000);
+    }
 
 </script>
