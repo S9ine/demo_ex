@@ -282,15 +282,26 @@
     .loading-spinner {
         width: 50px;
         height: 50px;
-        border: 4px solid rgba(255, 255, 255, 0.3);
-        border-top-color: var(--primary-color);
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
+        font-size: 40px; /* ขนาดของ emoji */
+        animation: pulse 1.5s ease-in-out infinite;
     }
-    @keyframes spin {
-        to { transform: rotate(360deg); }
+        .loading-spinner::before {
+        content: '💸'; /* คุณสามารถเปลี่ยนเป็น emoji อื่นๆ ได้ เช่น 💰, ✨, 🤑 */
     }
-
+    @keyframes pulse {
+        0% {
+            transform: scale(1);
+            opacity: 1;
+        }
+        50% {
+            transform: scale(1.3);
+            opacity: 0.7;
+        }
+        100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
     /* Chart container */
     .chart-container {
         position: relative;
