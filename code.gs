@@ -143,6 +143,27 @@ function deleteAccount(accountId) {
   }
 }
 
+function updateAccount(account) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(ACCOUNTS_SHEET);
+    if (!sheet) return { success: false, error: 'Sheet not found' };
+
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] == account.id) { // ค้นหาแถวด้วย ID
+        // อัปเดตข้อมูลในแถวที่เจอ
+        sheet.getRange(i + 1, 2, 1, 3).setValues([
+          [account.name, account.type, account.initialBalance]
+        ]);
+        return { success: true };
+      }
+    }
+    return { success: false, error: 'Account not found' };
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
 
 // ==================================================================
 //  TRANSFER FUNCTIONS
