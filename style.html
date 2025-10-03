@@ -1,59 +1,39 @@
 <style>
-    /* นำเข้า Font 'Prompt' จาก Google Fonts เพื่อการแสดงผลภาษาไทยที่สวยงาม 
-      ครอบคลุมน้ำหนักตัวอักษรหลายระดับ ตั้งแต่ Light (300) ถึง Bold (700)
-    */
     @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
 
-    /* กำหนด CSS Variables (ตัวแปร) สำหรับ Theme หลัก (Light Mode)
-      การใช้ตัวแปรช่วยให้การจัดการสีและสไตล์เป็นระบบและง่ายต่อการปรับเปลี่ยน
-      เช่น หากต้องการเปลี่ยนสีหลัก ก็แค่เปลี่ยนค่า --primary-color ที่เดียว
-    */
     :root {
-        --primary-color: #4A90E2; /* สีน้ำเงินหลัก */
-        --primary-darker: #357ABD; /* สีน้ำเงินเข้มขึ้นสำหรับ hover */
-        --secondary-color: #50E3C2; /* สีเขียวมินต์สำหรับเน้น */
-        --background-color: #f8f9fa; /* สีพื้นหลังหลัก */
-        --surface-color: #ffffff; /* สีพื้นผิวของ Card และ element อื่นๆ */
-        --text-color: #4a4a4a; /* สีตัวอักษรหลัก */
-        --text-muted-color: #9b9b9b; /* สีตัวอักษรรอง */
-        --border-color: #e0e0e0; /* สีเส้นขอบ */
-        --success-color: #4CAF50; /* สีสำหรับสถานะสำเร็จ (รายรับ) */
-        --danger-color: #F44336;  /* สีสำหรับสถานะอันตราย (รายจ่าย) */
-        --warning-color: #FF9800; /* สีสำหรับสถานะเตือน */
+        --primary-color: #4A90E2;
+        --primary-darker: #357ABD;
+        --secondary-color: #50E3C2;
+        --background-color: #f8f9fa;
+        --surface-color: #ffffff;
+        --text-color: #4a4a4a;
+        --text-muted-color: #9b9b9b;
+        --border-color: #e0e0e0;
+        --success-color: #4CAF50;
+        --danger-color: #F44336;
+        --warning-color: #FF9800;
         --shadow-sm: 0 4px 6px rgba(0, 0, 0, 0.05);
         --shadow-md: 0 8px 15px rgba(0, 0, 0, 0.1);
-        --border-radius: 12px; /* รัศมีความโค้งของขอบ */
+        --border-radius: 12px;
     }
 
-/* ======================================= */
-/* Mobile: Budget Page Controls Final Fix  */
-/* ======================================= */
 @media (max-width: 768px) {
     
     h4 {
-        font-size: 1.1rem; /* ใช้ rem เพื่อความยืดหยุ่น หรือใช้ 16px ก็ได้ครับ */
-    }
-    /*
-     * เลือกเป้าหมายไปที่ div ที่ครอบส่วนควบคุมทั้งหมด
-     * และสั่งให้ item ภายในสามารถขึ้นบรรทัดใหม่ได้
-    */
-    #budget .card-body .d-flex.align-items-center {
-        flex-wrap: wrap;
-        gap: 1rem; /* เพิ่มระยะห่างระหว่างส่วนต่างๆ */
+        font-size: 1.1rem;
     }
 
-    /*
-     * จัดการกลุ่มตัวเลือก เดือน/ปี ให้แสดงผลเต็มความกว้าง
-    */
+    #budget .card-body .d-flex.align-items-center {
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
     #budget .month-year-selector {
         width: 100%;
         justify-content: space-between;
     }
 
-    /*
-     * จัดการปุ่ม 'คัดลอก' ให้แสดงผลเต็มความกว้าง
-     * และเอา margin ด้านซ้ายที่เคยดันปุ่มไปทางขวาออก
-    */
     #budget .btn-info {
         margin-left: 0 !important;
         width: 100%;
@@ -68,25 +48,16 @@
         width: 100%;
     }
 
-/*
-  กำหนด CSS Variables และสไตล์ทั้งหมดสำหรับ Dark Mode
-  เมื่อ <body> มี attribute data-theme="dark" สไตล์เหล่านี้จะถูกใช้งาน
-*/
 [data-theme="dark"] .sticky-header {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 [data-theme="dark"] #incomeList .card-body,
 [data-theme="dark"] #expenseList .card-body {
-    /*
-     * กำหนดให้ตัวอักษรทั้งหมดใน card-body ของรายการหมวดหมู่
-     * (เช่น 'เงินเดือน', 'อาหาร') ใช้สีสว่างของ Dark Mode
-    */
     color: var(--text-color);
 }
 
 [data-theme="dark"] {
-    /* --- CSS Variables for Dark Theme --- */
     --primary-color: #58a6ff;
     --primary-darker: #3081f7;
     --secondary-color: #3ddda0;
@@ -96,19 +67,14 @@
     --text-muted-color: #8b949e;
     --border-color: #30363d;
 
-    /* --- General Adjustments --- */
-    /* ทำให้หัวข้อ Card และหัวข้อย่อย (h6) สว่างขึ้น */
     .card-header h5, h6 {
         color: var(--text-color);
     }
 
-    /* ทำให้ข้อความสถิติใน Card สว่างขึ้น */
     .stat-card h5 {
         color: var(--text-muted-color);
     }
     
-    /* --- Text Color Overrides --- */
-    /* ปรับสี Success, Danger, Warning สำหรับ Dark Mode ให้อ่านง่ายขึ้น */
     .text-success {
         color: #6ee7b7 !important;
     }
@@ -122,34 +88,23 @@
         color: var(--primary-color) !important;
     }
 
-    /* --- Form & Muted Text Fixes --- */
-    /* ทำให้ Label ของ Form, ตัวอักษรเล็กๆ และ text-muted สว่างขึ้น */
     .form-label,
     .card-body small.text-danger,
     .card-body small.text-success,
     .text-muted {
-        color: #a0aec0 !important; /* A brighter, muted gray */
+        color: #a0aec0 !important;
     }
 }
 
-    /* ตั้งค่าพื้นฐานสำหรับทั้งหน้าเว็บ
-      - box-sizing: border-box; ทำให้การคำนวณขนาดของ element รวม padding และ border เข้าไปด้วย
-      - font-family: ใช้ Font 'Prompt' ที่นำเข้ามา
-      - background-color: ใช้สีพื้นหลังจากตัวแปร
-      - color: ใช้สีตัวอักษรจากตัวแปร
-      - transition: ทำให้การเปลี่ยนสีพื้นหลัง (เมื่อสลับ theme) นุ่มนวลขึ้น
-    */
 body::-webkit-scrollbar {
     display: none;
 }
 
-/* สำหรับ Firefox */
 body {
     scrollbar-width: none;
 }
 
     body {
-
         box-sizing: border-box;
         font-family: 'Prompt', sans-serif;
         background-color: var(--background-color);
@@ -157,11 +112,6 @@ body {
         transition: background-color 0.3s ease, color 0.3s ease;
     }
 
-    /* สไตล์สำหรับ Navbar (เมนูหลักด้านบน)
-      - position: sticky; top: 0; ทำให้ Navbar "ติด" อยู่ด้านบนสุดของจอเมื่อเลื่อนเว็บ
-      - z-index: 1030; กำหนดลำดับการซ้อนทับให้อยู่เหนือ element อื่นๆ
-      - backdrop-filter: blur(10px); ทำให้พื้นหลังของ Navbar เบลอ (เมื่อโปร่งใส) ดูสวยงาม
-    */
     .navbar {
         background-color: rgba(var(--surface-color), 0.85);
         backdrop-filter: blur(10px);
@@ -180,7 +130,6 @@ body {
         color: var(--primary-color) !important;
     }
 
-    /* สไตล์สำหรับ Section ต่างๆ */
     .section {
         display: none;
         animation: fadeIn 0.5s ease-in-out;
@@ -189,27 +138,18 @@ body {
         display: block;
     }
 
-    /* Animation สำหรับการ Fade In เข้ามาของ Section */
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(15px); }
         to { opacity: 1; transform: translateY(0); }
     }
 
-    /*
-      สไตล์สำหรับ Card (กล่องเนื้อหา)
-      - background-color: ใช้สีพื้นผิวจากตัวแปร
-      - border: ใช้เส้นขอบสีจากตัวแปร
-      - border-radius: ใช้ค่าความโค้งจากตัวแปร
-      - box-shadow: ใช้เงาจากตัวแปร
-      - transition: ทำให้การเปลี่ยนแปลงของเงาและตำแหน่ง (transform) นุ่มนวล
-    */
     .card {
         background-color: var(--surface-color);
         border: 1px solid var(--border-color);
         border-radius: var(--border-radius);
         box-shadow: var(--shadow-sm);
         transition: transform 0.3s ease, box-shadow 0.3s ease;
-        overflow: hidden; /* ป้องกันไม่ให้ content ภายในทะลุขอบโค้ง */
+        overflow: hidden;
     }
 
     .card:hover {
@@ -224,7 +164,6 @@ body {
         font-weight: 600;
     }
 
-    /* สไตล์สำหรับปุ่ม (Button) */
     .btn {
         font-weight: 500;
         border-radius: 8px;
@@ -243,7 +182,6 @@ body {
         transform: translateY(-2px);
     }
 
-    /* สไตล์สำหรับ Form Input และ Select */
     .form-control, .form-select {
         background-color: var(--background-color);
         border: 1px solid var(--border-color);
@@ -256,9 +194,6 @@ body {
         box-shadow: 0 0 0 0.2rem rgba(var(--primary-color), 0.25);
     }
 
-    /* สไตล์สำหรับ Loading Overlay (หน้าจอตอนโหลด)
-      - backdrop-filter: blur(5px); ทำให้พื้นหลังของ Overlay เบลอ
-    */
     .loading-overlay {
         position: fixed;
         top: 0;
@@ -285,22 +220,20 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
 
-    /* --- เพิ่ม 4 บรรทัดนี้เข้าไป --- */
     display: flex;
-    flex-direction: column; /* จัดให้เรียงจากบนลงล่าง */
-    align-items: center;    /* จัดกลางแนวนอน */
-    justify-content: center;/* จัดกลางแนวตั้ง */
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
-    /* Spinner animation */
     .loading-spinner {
         width: 50px;
         height: 50px;
-        font-size: 40px; /* ขนาดของ emoji */
+        font-size: 40px;
         animation: pulse 1.5s ease-in-out infinite;
     }
         .loading-spinner::before {
-        content: '💸'; /* คุณสามารถเปลี่ยนเป็น emoji อื่นๆ ได้ เช่น 💰, ✨, 🤑 */
+        content: '💸';
     }
     @keyframes pulse {
         0% {
@@ -316,185 +249,182 @@ body {
             opacity: 1;
         }
     }
-    /* Chart container */
     .chart-container {
         position: relative;
-        height: 350px; /* ลดความสูงลงเล็กน้อยสำหรับ Mobile */
+        height: 350px;
         margin: 15px 0;
     }
 
+    /* ** REFACTOR: ลบ CSS ของ PIN Lock Screen ออก ** */
+
+    .fab {
+        position: fixed;
+        width: 60px;
+        height: 60px;
+        bottom: 30px;
+        right: 30px;
+        background-color: var(--primary-color);
+        color: #FFF;
+        border-radius: 50px;
+        text-align: center;
+        font-size: 24px;
+        box-shadow: var(--shadow-md);
+        border: none;
+        z-index: 1050;
+        transition: all 0.3s ease;
+    }
+    .fab:hover {
+        background-color: var(--primary-darker);
+        transform: scale(1.1);
+    }
+
+    .sticky-header {
+        position: sticky;
+        top: 0;
+        background-color: var(--background-color);
+        z-index: 1000;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); 
+        margin-top: 0 !important;
+    }
+
+    .account-card-small {
+        background-color: var(--surface-color);
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius);
+        padding: 1rem;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .account-card-small:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-sm);
+    }
+    .account-card-small .balance {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+    [data-theme="dark"] .account-card-small .balance {
+        color: var(--primary-color);
+    }
+
+    .modal-content {
+        background-color: var(--surface-color);
+        border-radius: var(--border-radius);
+        border: none;
+    }
+    .modal-header {
+        border-bottom: 1px solid var(--border-color);
+    }
+    .modal-footer {
+        border-top: 1px solid var(--border-color);
+    }
+
+    .bottom-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background-color: var(--surface-color);
+        box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        padding: 10px 0;
+        z-index: 1050;
+        border-top: 1px solid var(--border-color);
+    }
+    .bottom-nav .nav-link {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        color: var(--text-muted-color);
+        font-size: 0.75rem;
+        font-weight: 500;
+        transition: color 0.3s ease;
+        text-decoration: none;
+    }
+    .bottom-nav .nav-link i {
+        font-size: 1.5rem;
+        margin-bottom: 4px;
+    }
+    .bottom-nav .nav-link.active,
+    .bottom-nav .nav-link:hover {
+        color: var(--primary-color);
+    }
+
+    body {
+        padding-bottom: 80px;
+    }
+
+    .navbar {
+        display: none !important;
+    }
+
+    .fab {
+        bottom: 90px;
+    }
+
+        /* ======================================= */
+    /* Transaction Card List Styles (ใหม่)     */
     /* ======================================= */
-/* PIN Lock Screen Styles (ใหม่)        */
-/* ======================================= */
-.pin-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: var(--background-color);
-    display: none; /* ซ่อนไว้เป็นค่าเริ่มต้น */
-    justify-content: center;
-    align-items: center;
-    z-index: 10000;
-    flex-direction: column;
-}
+    .transaction-card {
+        display: flex;
+        align-items: center;
+        background-color: var(--surface-color);
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        border-radius: var(--border-radius);
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow-sm);
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    }
 
-.pin-container {
-    background-color: var(--surface-color);
-    padding: 2.5rem;
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-md);
-    text-align: center;
-    width: 90%;
-    max-width: 380px;
-}
+    .transaction-card:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-md);
+    }
 
-.pin-input-group {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    margin: 1.5rem 0;
-}
+    .transaction-card-icon {
+        flex-shrink: 0;
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 1rem;
+        color: #fff;
+    }
 
-.pin-input {
-    width: 50px;
-    height: 60px;
-    font-size: 2rem;
-    text-align: center;
-    border: 2px solid var(--border-color);
-    background-color: var(--background-color);
-    color: var(--text-color);
-    border-radius: 8px;
-    outline: none;
-    transition: border-color 0.3s;
-}
+    /* สีไอคอนตามประเภทรายการ */
+    .transaction-card-icon.income { background-color: var(--success-color); }
+    .transaction-card-icon.expense { background-color: var(--danger-color); }
+    .transaction-card-icon.transfer { background-color: var(--primary-color); }
 
-.pin-input:focus {
-    border-color: var(--primary-color);
-}
+    .transaction-card-details {
+        flex-grow: 1;
+    }
 
-/* ======================================= */
-/* Floating Action Button (FAB) Styles     */
-/* ======================================= */
-.fab {
-    position: fixed;
-    width: 60px;
-    height: 60px;
-    bottom: 30px;
-    right: 30px;
-    background-color: var(--primary-color);
-    color: #FFF;
-    border-radius: 50px;
-    text-align: center;
-    font-size: 24px;
-    box-shadow: var(--shadow-md);
-    border: none;
-    z-index: 1050;
-    transition: all 0.3s ease;
-}
-.fab:hover {
-    background-color: var(--primary-darker);
-    transform: scale(1.1);
-}
+    .transaction-card-details h6 {
+        margin-bottom: 0;
+        font-weight: 600;
+        color: var(--text-color);
+    }
 
-/* ======================================= */
-/* Dashboard Account List Styles           */
-/* ======================================= */
-.sticky-header {
-    position: sticky;
-    top: 0; /* ทำให้ติดที่ขอบบนสุดของพื้นที่เลื่อน */
-    background-color: var(--background-color); /* ใส่สีพื้นหลังเพื่อไม่ให้เนื้อหาข้างใต้ทะลุขึ้นมา */
-    z-index: 1000; /* ทำให้แสดงอยู่ชั้นบนสุดเสมอ */
-    padding-top: 1rem;
-    padding-bottom: 1rem;
-    /* เพิ่มเงาเล็กน้อยเพื่อแยกส่วนกับเนื้อหาข้างล่างตอนเลื่อน */
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); 
-    margin-top: 0 !important; /* ยกเลิก margin-top เดิมเมื่อติดขอบ */
-}
+    .transaction-card-details small {
+        color: var(--text-muted-color);
+        font-size: 0.85rem;
+    }
 
-.account-card-small {
-    background-color: var(--surface-color);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    padding: 1rem;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.account-card-small:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-sm);
-}
-.account-card-small .balance {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--primary-color);
-}
-[data-theme="dark"] .account-card-small .balance {
-    color: var(--primary-color);
-}
-
-/* Modal Styling */
-.modal-content {
-    background-color: var(--surface-color);
-    border-radius: var(--border-radius);
-    border: none;
-}
-.modal-header {
-    border-bottom: 1px solid var(--border-color);
-}
-.modal-footer {
-    border-top: 1px solid var(--border-color);
-}
-
-/* ======================================= */
-/* Bottom Mobile Navigation (ใหม่)         */
-/* ======================================= */
-.bottom-nav {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background-color: var(--surface-color);
-    box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    padding: 10px 0;
-    z-index: 1050;
-    border-top: 1px solid var(--border-color);
-}
-.bottom-nav .nav-link {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    color: var(--text-muted-color);
-    font-size: 0.75rem;
-    font-weight: 500;
-    transition: color 0.3s ease;
-    text-decoration: none; /* เพิ่มเข้ามาเพื่อเอาเส้นใต้ออก */
-}
-.bottom-nav .nav-link i {
-    font-size: 1.5rem; /* ขนาดไอคอน */
-    margin-bottom: 4px;
-}
-.bottom-nav .nav-link.active,
-.bottom-nav .nav-link:hover {
-    color: var(--primary-color);
-}
-
-/* ปรับแก้ Body เพื่อไม่ให้ Content โดนเมนูล่างบัง */
-body {
-    padding-bottom: 80px; /* เพิ่มพื้นที่ด้านล่าง */
-}
-
-/* ซ่อน Navbar เดิม */
-.navbar {
-    display: none !important;
-}
-
-/* ปรับปุ่ม FAB ไม่ให้ชิดขอบเกินไป */
-.fab {
-    bottom: 90px;
-}
+    .transaction-card-amount {
+        font-weight: 600;
+        font-size: 1.1rem;
+        text-align: right;
+    }
     
+    .transaction-card-delete {
+        margin-left: 1rem;
+    }
 </style>
