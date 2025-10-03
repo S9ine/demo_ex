@@ -1,5 +1,3 @@
-
-
 function doGet() {
   let html = HtmlService.createTemplateFromFile('index').evaluate()
     .setTitle('ระบบบันทึกรายรับ-รายจ่าย')
@@ -39,7 +37,9 @@ function initializeSheets() {
     transactionsSheet.getRange(1, 1, 1, headers[0].length).setValues(headers).setFontWeight('bold');
   }
   
-  // Create Categories sheet
+  // ==================================================================
+  //  ต้องมีส่วนนี้ไว้เสมอ เพื่อสร้างชีต Categories
+  // ==================================================================
   let categoriesSheet = ss.getSheetByName(CATEGORIES_SHEET);
   if (!categoriesSheet) {
     categoriesSheet = ss.insertSheet(CATEGORIES_SHEET);
@@ -48,17 +48,10 @@ function initializeSheets() {
     ]);
     categoriesSheet.getRange(1, 1, 1, 4).setFontWeight('bold');
     
-    // Add default categories
-    const defaultCategories = [
-      [1, 'เงินเดือน', 'income', '#4caf50'],
-      [2, 'รายได้เสริม', 'income', '#8bc34a'],
-      [3, 'อาหาร', 'expense', '#ff9800'],
-      [4, 'เดินทาง', 'expense', '#f44336'],
-      [5, 'ช้อปปิ้ง', 'expense', '#e91e63'],
-      [6, 'บิล/ค่าใช้จ่าย', 'expense', '#9c27b0']
-    ];
-    categoriesSheet.getRange(2, 1, defaultCategories.length, 4).setValues(defaultCategories);
+    // --- แต่เราลบเฉพาะส่วนข้อมูลเริ่มต้น (defaultCategories) ออกไป ---
+    // ทำให้ชีตถูกสร้างขึ้นมาแบบว่างๆ พร้อมให้ผู้ใช้เพิ่มข้อมูลเอง
   }
+  // ==================================================================
   
   // Create Budgets sheet
   let budgetsSheet = ss.getSheetByName(BUDGETS_SHEET);
@@ -105,7 +98,9 @@ function saveTransaction(transaction) {
 
 function saveMultipleTransactions(transactions) {
   try {
-    const ss = SpreadsheetApp.getActiveSpreadpreheet();
+    //  =======  FIXED THIS LINE  =======
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    //  =================================
     let sheet = ss.getSheetByName(TRANSACTIONS_SHEET);
     if (!sheet) {
       initializeSheets(); // ถ้ายังไม่มีชีต ให้สร้างก่อน
