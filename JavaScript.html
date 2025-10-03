@@ -243,15 +243,15 @@ function setupPinInputLogic() {
             .then(result => { if (result.isConfirmed) { localStorage.removeItem('appPIN'); Swal.fire('สำเร็จ!', 'ยกเลิกการใช้ PIN เรียบร้อยแล้ว', 'success'); } });
     }
 
-    function showSection(sectionName) {
-        $('.section').removeClass('active');
-        $('#' + sectionName).addClass('active');
-        $('.nav-link').removeClass('active');
-        $(`a[onclick="showSection('${sectionName}')"]`).addClass('active');
-        
-        const sectionLoaders = { dashboard: updateDashboard, transactions: loadTransactionHistory, categories: loadCategories, budget: loadBudgetForm, tax: loadTaxData };
-        if (sectionLoaders[sectionName]) sectionLoaders[sectionName]();
-    }
+function showSection(sectionName) {
+    $('.section').removeClass('active');
+    $('#' + sectionName).addClass('active');
+    $('.nav-link').removeClass('active'); // บรรทัดที่จะแก้ไข
+    $(`a[onclick="showSection('${sectionName}')"]`).addClass('active'); // บรรทัดที่จะแก้ไข
+    
+    const sectionLoaders = { dashboard: updateDashboard, transactions: loadTransactionHistory, categories: loadCategories, budget: loadBudgetForm, tax: loadTaxData };
+    if (sectionLoaders[sectionName]) sectionLoaders[sectionName]();
+}
 
     // ===================================================================================
     // ACCOUNTS MANAGEMENT
